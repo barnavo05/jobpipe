@@ -2,7 +2,7 @@
 
 handle_update() is used by both:
   * polling (python -m jobpipe bot --once) on GitHub Actions or your laptop
-  * the optional instant webhook (api/telegram.py on Vercel)
+  * the optional instant webhook (app.py on Vercel)
 """
 from __future__ import annotations
 
