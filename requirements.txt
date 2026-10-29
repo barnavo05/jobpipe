@@ -1,0 +1,5 @@
+# Core deps (bot + webhook). Kept light so the 10-minute bot workflow installs fast.
+requests>=2.31
+PyYAML>=6.0
+SQLAlchemy>=2.0
+psycopg[binary]>=3.1
