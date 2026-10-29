@@ -70,6 +70,11 @@ def main(argv: list[str] | None = None) -> int:
         print("DATABASE_URL secret is missing. On GitHub Actions a SQLite file is wiped after every run, "
               "so users and jobs would vanish. Add your Supabase URL as a repository secret.")
         return 1
+    try:
+        from sqlalchemy.engine import make_url
+        print("database:", make_url(db._normalize_url(config.DATABASE_URL)).render_as_string(hide_password=True))
+    except Exception as exc:
+        print(f"database URL could not be parsed: {type(exc).__name__}")
     db.init_db()
 
     if args.cmd == "init":
