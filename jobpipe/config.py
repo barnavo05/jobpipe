@@ -49,7 +49,7 @@ ADZUNA_APP_KEY = _env("ADZUNA_APP_KEY")
 
 # JobSpy (Indeed / LinkedIn / Naukri scraping). Keep volume low to avoid blocks.
 JOBSPY_ENABLED = _env("JOBSPY_ENABLED", "1") == "1"
-JOBSPY_SITES = [s.strip() for s in _env("JOBSPY_SITES", "indeed,linkedin,naukri").split(",") if s.strip()]
+JOBSPY_SITES = [s.strip() for s in _env("JOBSPY_SITES", "indeed,linkedin,naukri,glassdoor").split(",") if s.strip()]
 JOBSPY_RESULTS = _int("JOBSPY_RESULTS", 50)
 HOURS_OLD = _int("HOURS_OLD", 48)
 
