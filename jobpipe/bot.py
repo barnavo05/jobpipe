@@ -31,8 +31,20 @@ HELP = (
     "/exclude intern, sales  hide titles with these words\n"
     "/pause  stop alerts for a while\n"
     "/resume  turn alerts back on\n"
-    "/stop  delete all your data\n\n"
+    "/stop  delete all your data\n"
+    "/privacy  what I store about you\n\n"
     "Alerts land once a day. Tap 👎 on jobs that miss and I'll learn."
+)
+
+PRIVACY = (
+    "<b>What JobPipe stores</b>\n\n"
+    "• Your Telegram chat id and first name, so I can message you\n"
+    "• The role, experience and cities you picked\n"
+    "• Which jobs I sent you and your 👎 taps\n\n"
+    "<b>What it never sees</b>\n"
+    "Your phone number, username, contacts or other chats. Telegram doesn't share those with bots.\n\n"
+    "Nothing is sold or shared. Send /stop and everything about you is deleted instantly.\n"
+    "The code is open source on GitHub, so anyone can check this."
 )
 
 
@@ -154,6 +166,8 @@ def handle_message(tg: Telegram, msg: dict) -> None:
             tg.send(chat_id, f"Got it, I'll hide titles with: {html.escape(', '.join(words))}")
     elif cmd == "/help":
         tg.send(chat_id, HELP)
+    elif cmd == "/privacy":
+        tg.send(chat_id, PRIVACY)
     elif cmd == "/stats" and config.ADMIN_CHAT_ID and chat_id == str(config.ADMIN_CHAT_ID):
         total, active = db.count_users()
         tg.send(chat_id, f"👥 {total} users, {active} active")
@@ -240,6 +254,7 @@ def set_commands(tg: Telegram) -> None:
         {"command": "pause", "description": "Pause alerts"},
         {"command": "resume", "description": "Resume alerts"},
         {"command": "stop", "description": "Delete my data"},
+        {"command": "privacy", "description": "What the bot stores"},
         {"command": "help", "description": "Help"},
     ]))
 

@@ -68,6 +68,7 @@ def run(users: list[User] | None = None) -> dict:
         log.info("searched %r @ %s", term, loc)
     report["search"] = dict(search_counts)
 
+    report["by_source"] = dict(Counter(j.source for j in all_jobs))
     report["new_jobs"] = db.insert_jobs(all_jobs)
     report["pruned"] = db.prune_jobs()
     log.info("collected %s jobs, %s new", len(all_jobs), report["new_jobs"])
