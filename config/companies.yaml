@@ -16,13 +16,10 @@ greenhouse:
   - {slug: mongodb, name: MongoDB}
   - {slug: twilio, name: Twilio}
   - {slug: rubrik, name: Rubrik}
-  - {slug: phonepe, name: PhonePe}
-  - {slug: postman, name: Postman}
   - {slug: okta, name: Okta}
   - {slug: elastic, name: Elastic}
   - {slug: gitlab, name: GitLab}
   - {slug: samsara, name: Samsara}
-  - {slug: intuit, name: Intuit}
   - {slug: coinbase, name: Coinbase}
   - {slug: zscaler, name: Zscaler}
 
@@ -31,10 +28,8 @@ lever:
   - {slug: cred, name: CRED}
   - {slug: paytm, name: Paytm}
   - {slug: zeta, name: Zeta}
-  - {slug: highlevel, name: HighLevel}
 
 ashby:
   - {slug: deel, name: Deel}
-  - {slug: zepto, name: Zepto}
   - {slug: sarvam, name: Sarvam AI}
   - {slug: plaid, name: Plaid}
