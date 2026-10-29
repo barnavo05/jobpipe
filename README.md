@@ -93,7 +93,7 @@ Tip: this list is the most reliable source you have. 50 to 100 good companies he
 
 ### Step 7 (optional): Instant bot replies with Vercel
 By default the bot replies every ~10 minutes. For replies in about a second, free:
-1. On [vercel.com](https://vercel.com), sign in with GitHub, click **Add New > Project** and import this repo. No build settings needed: it picks up `api/telegram.py`.
+1. On [vercel.com](https://vercel.com), sign in with GitHub, click **Add New > Project** and import this repo. No build settings needed: it finds `app.py` on its own.
 2. Before deploying, open **Environment Variables** and add `TELEGRAM_BOT_TOKEN`, `DATABASE_URL` (same values as your GitHub secrets) and `SUPABASE_POOLER_HOST` (your pooler host, e.g. `aws-1-us-west-2.pooler.supabase.com`). Click **Deploy**.
 3. Copy your app URL (like `https://jobpipe-xyz.vercel.app`). In GitHub **Actions**, run **Switch bot reply mode** with mode `instant` and that URL.
 
@@ -140,7 +140,7 @@ jobpipe/
   bot.py                 Telegram signup flow and commands
   notify.py              daily digest
   db.py                  SQLite/Postgres storage
-api/telegram.py          optional Vercel webhook
+app.py                   optional Vercel webhook (instant replies)
 config/companies.yaml    company boards to watch
 .github/workflows/       daily run, bot polling, board checker, reply mode switch
 ```
