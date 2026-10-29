@@ -1,8 +1,10 @@
 """OPTIONAL instant-reply mode: Telegram webhook as a free Vercel serverless function.
 
 Without this, the bot answers whenever the GitHub Actions bot workflow runs (every ~10 min).
-With this deployed, replies are instant. Setup steps are in README.md (Step 7).
+With this deployed, replies are instant. Setup steps are in README.md (Step 7). Needs the env vars
+TELEGRAM_BOT_TOKEN, DATABASE_URL and SUPABASE_POOLER_HOST on Vercel.
 """
+import hmac
 import json
 import os
 import sys
@@ -10,7 +12,7 @@ from http.server import BaseHTTPRequestHandler
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from jobpipe import bot, db  # noqa: E402
+from jobpipe import bot, config, db  # noqa: E402
 from jobpipe.telegram_api import Telegram  # noqa: E402
 
 _ready = False
@@ -19,8 +21,9 @@ _ready = False
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         global _ready
-        expected = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
-        if not expected or self.headers.get("X-Telegram-Bot-Api-Secret-Token") != expected:
+        expected = config.TELEGRAM_WEBHOOK_SECRET
+        got = self.headers.get("X-Telegram-Bot-Api-Secret-Token") or ""
+        if not expected or not hmac.compare_digest(got, expected):
             self.send_response(401)
             self.end_headers()
             return

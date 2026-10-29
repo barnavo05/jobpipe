@@ -113,3 +113,43 @@ def test_end_to_end_daily_run(tg, monkeypatch, tmp_path):
     collect.run()
     n2 = notify.run(tg=tg)
     assert n2["notified"] == 0 and tg.sent == []
+
+
+def _seed_jobs(n, company="Acme"):
+    from jobpipe.normalize import finalize
+    db.insert_jobs([finalize(Job(source="greenhouse", title="Data Analyst", company=f"{company}{i}",
+                                 location="Bengaluru, India", url=f"https://x/{company}{i}")) for i in range(n)])
+
+
+def test_jobs_command_gives_instant_matches_without_repeats(tg):
+    signup(tg)
+    _seed_jobs(7)
+    tg.sent.clear()
+    bot.handle_update(tg, msg("/jobs"))
+    assert "right now" in tg.last["text"] and tg.last["text"].count("Apply here") == bot.JOBS_PER_REQUEST
+    bot.handle_update(tg, msg("/jobs"))
+    assert tg.last["text"].count("Apply here") == 2  # only the unseen ones
+    bot.handle_update(tg, msg("/jobs"))
+    assert "seen every match" in tg.last["text"]
+
+
+def test_jobs_command_needs_setup(tg):
+    bot.handle_update(tg, msg("/jobs"))
+    # a brand-new user is sent through signup, never an empty digest
+    assert "Apply here" not in tg.last["text"]
+
+
+def test_poll_skips_quietly_when_webhook_is_on(tg):
+    from jobpipe.telegram_api import TelegramError
+
+    class Hooked(type(tg)):
+        def get_updates(self, offset, timeout=0):
+            raise TelegramError("getUpdates failed: 409 Conflict: terminated by setWebhook")
+    assert bot.poll(once=True, tg=Hooked()) == 0
+
+
+def test_webhook_secret_is_derived_from_token():
+    import hashlib
+    token = "123:abc"
+    want = hashlib.sha256(f"jobpipe-webhook:{token}".encode()).hexdigest()[:48]
+    assert len(want) == 48 and want.isalnum()

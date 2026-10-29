@@ -1,0 +1,42 @@
+name: Switch bot reply mode
+
+# Run manually. "instant" points Telegram at your Vercel URL (replies in about a second).
+# "polling" switches back to the 10-minute bot workflow.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "instant or polling"
+        required: true
+        default: instant
+        type: choice
+        options: [instant, polling]
+      vercel_url:
+        description: "Your Vercel app URL, like https://jobpipe-xyz.vercel.app (only for instant)"
+        required: false
+
+jobs:
+  switch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Switch to instant replies
+        if: inputs.mode == 'instant'
+        run: python -m jobpipe set-webhook "${URL%/}/api/telegram"
+        env:
+          URL: ${{ inputs.vercel_url }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPABASE_POOLER_HOST: aws-1-us-west-2.pooler.supabase.com
+      - name: Switch back to polling
+        if: inputs.mode == 'polling'
+        run: python -m jobpipe delete-webhook
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPABASE_POOLER_HOST: aws-1-us-west-2.pooler.supabase.com

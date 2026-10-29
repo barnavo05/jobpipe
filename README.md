@@ -6,6 +6,8 @@ JobPipe checks company career pages and job portals every day, matches what it f
 
 Runs 100% free: GitHub Actions + Supabase free tier + Telegram bot.
 
+**Try it:** [t.me/jobpipe_alerts_bot](https://t.me/jobpipe_alerts_bot). Set up in 20 seconds, then get a digest every morning or send `/jobs` anytime.
+
 ---
 
 ## How it works
@@ -90,14 +92,12 @@ Run the **Check company boards** workflow. It tests every slug in `config/compan
 Tip: this list is the most reliable source you have. 50 to 100 good companies here beats any scraper.
 
 ### Step 7 (optional): Instant bot replies with Vercel
-By default the bot replies every ~10 minutes. For instant replies, free:
-1. Import the repo on [vercel.com](https://vercel.com) (no build settings needed, it picks up `api/telegram.py`).
-2. Add env vars on Vercel: `TELEGRAM_BOT_TOKEN`, `DATABASE_URL`, and `TELEGRAM_WEBHOOK_SECRET` (any long random string).
-3. Deploy, then on your laptop with the same values in `.env`:
-   ```bash
-   python -m jobpipe set-webhook https://<your-app>.vercel.app/api/telegram
-   ```
-4. Delete `.github/workflows/bot.yml` (polling and webhooks can't both run). Undo anytime with `python -m jobpipe delete-webhook`.
+By default the bot replies every ~10 minutes. For replies in about a second, free:
+1. On [vercel.com](https://vercel.com), sign in with GitHub, click **Add New > Project** and import this repo. No build settings needed: it picks up `api/telegram.py`.
+2. Before deploying, open **Environment Variables** and add `TELEGRAM_BOT_TOKEN`, `DATABASE_URL` (same values as your GitHub secrets) and `SUPABASE_POOLER_HOST` (your pooler host, e.g. `aws-1-us-west-2.pooler.supabase.com`). Click **Deploy**.
+3. Copy your app URL (like `https://jobpipe-xyz.vercel.app`). In GitHub **Actions**, run **Switch bot reply mode** with mode `instant` and that URL.
+
+That's it. The webhook password is derived from your bot token, so there's no extra secret. The 10-minute bot workflow notices webhook mode and steps aside on its own. To go back, run the same workflow with mode `polling`.
 
 ---
 
@@ -110,13 +110,13 @@ cp .env.example .env                                   # add your bot token
 python -m jobpipe bot              # bot runs live, Ctrl+C to stop
 python -m jobpipe collect          # fetch jobs
 python -m jobpipe notify --dry-run # print digests instead of sending
-python -m pytest -q                # 31 tests
+python -m pytest -q                # run the tests
 ```
 
 Without `DATABASE_URL` it uses a local SQLite file, so you can play with zero setup.
 
 ## Bot commands
-`/start` set up · `/me` see settings · `/settings` change them · `/exclude intern, sales` hide titles · `/pause` · `/resume` · `/stop` deletes all your data
+`/start` set up · `/jobs` best new matches right now · `/me` see settings · `/settings` change them · `/exclude intern, sales` hide titles · `/pause` · `/resume` · `/privacy` what's stored · `/stop` deletes all your data
 
 ---
 
@@ -142,8 +142,23 @@ jobpipe/
   db.py                  SQLite/Postgres storage
 api/telegram.py          optional Vercel webhook
 config/companies.yaml    company boards to watch
-.github/workflows/       daily run, bot polling, board checker
+.github/workflows/       daily run, bot polling, board checker, reply mode switch
 ```
+
+## Privacy
+
+The bot stores a user's Telegram chat id, first name, the preferences they pick, and which jobs it sent them. Telegram never gives bots phone numbers, usernames or contacts. `/stop` deletes everything about a user immediately. Nothing is sold or shared. Secrets (bot token, database URL) live only in GitHub Secrets and never in this repo.
+
+## Disclaimer
+
+This is a personal, non-commercial, educational project. It is not affiliated with or endorsed by LinkedIn, Indeed, Naukri, Glassdoor, Adzuna or any company whose jobs it lists.
+
+- Company career boards (Greenhouse, Lever, Ashby) and Adzuna are read through their official public APIs.
+- LinkedIn, Indeed and Naukri do not offer free public APIs. Their listings are fetched at low volume through the open-source [JobSpy](https://github.com/speedyapply/JobSpy) library, which may conflict with those sites' terms of service. If you run your own copy, review those terms, keep volume low, or turn this off with `JOBSPY_ENABLED=0`.
+- Every alert links back to the original posting. JobPipe never hosts, edits or republishes full job descriptions, and never applies to jobs on anyone's behalf.
+- Listings come from third parties and may be outdated or inaccurate. Always verify a job on the employer's own site before sharing personal details. No job will ever ask you to pay to apply.
+
+Provided as is, without warranty. Use at your own risk.
 
 ## Roadmap ideas
 - Email digests (Resend free tier) for people who don't use Telegram

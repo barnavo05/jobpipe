@@ -26,6 +26,7 @@ LOCATION_LABELS = {k: CITIES[k][0] for k in CITIES} | {"india": "Anywhere in Ind
 
 HELP = (
     "Here's what I can do:\n\n"
+    "/jobs  get your best new matches right now\n"
     "/me  see your current alert settings\n"
     "/settings  change role, experience or cities\n"
     "/exclude intern, sales  hide titles with these words\n"
@@ -115,7 +116,31 @@ def ask_loc(tg: Telegram, chat_id: str) -> None:
 def finish(tg: Telegram, user: User) -> None:
     user = db.update_user(user.chat_id, state="ready", active=True)
     tg.send(user.chat_id, "You're all set 🎉\n\n" + describe(user) +
-            "\n\nYour first alerts come with the next daily run. /help shows everything else.")
+            "\n\nYou'll get a daily digest every morning. Want jobs right now? Send /jobs\n"
+            "/help shows everything else.")
+
+
+JOBS_PER_REQUEST = 5
+
+
+def send_jobs_now(tg: Telegram, user: User) -> None:
+    """On-demand matches from jobs already collected (no scraping per request: fast, never blocked)."""
+    from .match import matches_for  # local import keeps bot importable without heavy deps
+    from .notify import build_digest
+    if not profile_complete(user):
+        tg.send(user.chat_id, "Let's set you up first. Send /start.")
+        return
+    picked = matches_for(user, db.recent_jobs(), db.sent_uids(user.chat_id), JOBS_PER_REQUEST,
+                         db.disliked_companies(user.chat_id))
+    if not picked:
+        tg.send(user.chat_id, "You've seen every match I have right now 🙌\n\n"
+                              "Fresh jobs are collected every morning, so check back tomorrow, "
+                              "or widen your search with /settings.")
+        return
+    text, keyboard = build_digest(user, picked)
+    text = text.replace("for you today", "for you right now", 1)
+    tg.send(user.chat_id, text, keyboard)
+    db.mark_sent(user.chat_id, [j.uid for j in picked])
 
 
 def handle_message(tg: Telegram, msg: dict) -> None:
@@ -164,6 +189,8 @@ def handle_message(tg: Telegram, msg: dict) -> None:
             words = [w.strip() for w in re.split(r"[,\n]", arg) if w.strip()][:15]
             db.update_user(chat_id, exclude=words)
             tg.send(chat_id, f"Got it, I'll hide titles with: {html.escape(', '.join(words))}")
+    elif cmd == "/jobs":
+        send_jobs_now(tg, user)
     elif cmd == "/help":
         tg.send(chat_id, HELP)
     elif cmd == "/privacy":
@@ -247,6 +274,7 @@ def handle_update(tg: Telegram, update: dict) -> None:
 
 def set_commands(tg: Telegram) -> None:
     tg.call("setMyCommands", commands=json.dumps([
+        {"command": "jobs", "description": "Get matching jobs right now"},
         {"command": "start", "description": "Set up job alerts"},
         {"command": "me", "description": "See your settings"},
         {"command": "settings", "description": "Change role, experience, cities"},
@@ -265,7 +293,13 @@ def poll(once: bool = False, tg: Telegram | None = None) -> int:
     handled = 0
     offset = int(db.kv_get("tg_offset", "0") or 0) or None
     while True:
-        updates = tg.get_updates(offset, timeout=0 if once else 25)
+        try:
+            updates = tg.get_updates(offset, timeout=0 if once else 25)
+        except TelegramError as exc:
+            if "409" in str(exc):  # webhook mode is on: Vercel handles messages, nothing to poll
+                log.info("webhook is active, skipping polling")
+                return handled
+            raise
         for upd in updates:
             handle_update(tg, upd)
             handled += 1
