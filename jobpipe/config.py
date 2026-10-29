@@ -1,6 +1,7 @@
 """All settings come from environment variables (or a local .env file)."""
 from __future__ import annotations
 
+import hashlib
 import os
 from pathlib import Path
 
@@ -63,3 +64,9 @@ COMPANIES_FILE = Path(_env("COMPANIES_FILE", str(ROOT / "config" / "companies.ya
 # Supabase "Direct connection" URLs are IPv6 only and fail on GitHub runners.
 # Set this to your session pooler host and direct URLs get rewritten automatically.
 SUPABASE_POOLER_HOST = _env("SUPABASE_POOLER_HOST")
+
+# Proves webhook calls really come from Telegram. Derived from the bot token unless set,
+# so there's no extra secret to manage (Telegram allows A-Z a-z 0-9 _ -).
+TELEGRAM_WEBHOOK_SECRET = _env("TELEGRAM_WEBHOOK_SECRET") or (
+    hashlib.sha256(f"jobpipe-webhook:{TELEGRAM_BOT_TOKEN}".encode()).hexdigest()[:48]
+    if TELEGRAM_BOT_TOKEN else "")

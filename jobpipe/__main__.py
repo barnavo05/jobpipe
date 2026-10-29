@@ -99,13 +99,10 @@ def main(argv: list[str] | None = None) -> int:
         return verify_companies()
     elif args.cmd == "set-webhook":
         from .telegram_api import Telegram
-        secret = os.environ.get("TELEGRAM_WEBHOOK_SECRET")
-        if not secret:
-            print("Set TELEGRAM_WEBHOOK_SECRET first (any random string).")
-            return 1
-        Telegram().call("setWebhook", url=args.url, secret_token=secret,
-                        allowed_updates=json.dumps(["message", "callback_query"]))
-        print("webhook set, polling is now disabled")
+        Telegram().call("setWebhook", url=args.url, secret_token=config.TELEGRAM_WEBHOOK_SECRET,
+                        allowed_updates=json.dumps(["message", "callback_query"]), drop_pending_updates="false")
+        bot.set_commands(Telegram())
+        print(f"webhook set to {args.url}: replies are instant now, polling is switched off")
     elif args.cmd == "delete-webhook":
         from .telegram_api import Telegram
         Telegram().call("deleteWebhook")
