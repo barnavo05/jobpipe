@@ -65,7 +65,9 @@ def search(term: str, location: str | None) -> list[Job]:
                 is_remote=remote, results_wanted=config.JOBSPY_RESULTS,
                 hours_old=config.HOURS_OLD, country_indeed="India", verbose=0,
             )
-            jobs.extend(finalize(j) for j in parse_dataframe(df))
+            found = parse_dataframe(df)
+            log.info("jobspy %s: %d results for %r @ %s", site, len(found), term, loc)
+            jobs.extend(finalize(j) for j in found)
         except Exception as exc:
             log.warning("jobspy %s failed for %r @ %s: %s", site, term, loc, exc)
         time.sleep(2)  # be polite
