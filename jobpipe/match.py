@@ -78,4 +78,22 @@ def matches_for(user: User, jobs: list[Job], already_sent: set[str], limit: int,
                 muted_companies: set[str] = frozenset()) -> list[Job]:
     picked = [j for j in jobs if j.uid not in already_sent and is_match(j, user, muted_companies)]
     picked.sort(key=lambda j: score(j, user), reverse=True)
-    return picked[:limit]
+    return diversify(picked, limit)
+
+
+def _family(job: Job) -> str:
+    return "company site" if job.source in ("greenhouse", "lever", "ashby") else job.source
+
+
+def diversify(ranked: list[Job], limit: int) -> list[Job]:
+    """Round robin across sources (LinkedIn, Naukri, Indeed, company sites...) so one
+    portal can't fill the whole digest. Within each source, best score first."""
+    buckets: dict[str, list[Job]] = {}
+    for j in ranked:
+        buckets.setdefault(_family(j), []).append(j)
+    out: list[Job] = []
+    while len(out) < limit and any(buckets.values()):
+        for fam in list(buckets):
+            if buckets[fam] and len(out) < limit:
+                out.append(buckets[fam].pop(0))
+    return out

@@ -52,3 +52,13 @@ def test_ranking_and_dedupe():
             job("Product Analyst", company="C")]
     picked = matches_for(fresher_da, jobs, already_sent={jobs[2].uid}, limit=5)
     assert [j.company for j in picked] == ["B", "A"]
+
+
+def test_digest_mixes_sources():
+    jobs = [job(f"Data Analyst {i}", company=f"L{i}", source="jobspy:linkedin") for i in range(8)]
+    jobs += [job("Data Analyst", company="N1", source="jobspy:naukri", desc="0-1 years experience"),
+             job("Data Analyst", company="I1", source="jobspy:indeed"),
+             job("Data Analyst", company="G1", source="greenhouse")]
+    picked = matches_for(fresher_da, jobs, set(), limit=5)
+    sources = {j.source for j in picked}
+    assert {"jobspy:naukri", "jobspy:indeed", "greenhouse", "jobspy:linkedin"} <= sources
