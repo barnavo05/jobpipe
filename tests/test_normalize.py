@@ -55,3 +55,15 @@ def test_clean_text_handles_double_escaped_html():
 def test_finalize_fills_fields():
     j = finalize(Job(source="x", title="Junior Data Analyst", company="Acme", location="Remote, India", url="u"))
     assert j.is_remote and j.exp_min == 0 and j.uid
+
+
+def test_supabase_direct_url_rewritten_to_pooler(monkeypatch):
+    from jobpipe import config, db
+    monkeypatch.setattr(config, "SUPABASE_POOLER_HOST", "aws-1-us-west-2.pooler.supabase.com")
+    direct = "postgresql://postgres:Abc123@db.xpqepcxlethbgmblrlwe.supabase.co:5432/postgres"
+    assert db._normalize_url(direct) == (
+        "postgresql+psycopg://postgres.xpqepcxlethbgmblrlwe:Abc123@aws-1-us-west-2.pooler.supabase.com:5432/postgres")
+    pooled = "postgresql://postgres.xpqepcxlethbgmblrlwe:Abc123@aws-1-us-west-2.pooler.supabase.com:5432/postgres"
+    assert db._normalize_url(pooled) == pooled.replace("postgresql://", "postgresql+psycopg://")
+    monkeypatch.setattr(config, "SUPABASE_POOLER_HOST", "")
+    assert "db.xpqepcxlethbgmblrlwe" in db._normalize_url(direct)
