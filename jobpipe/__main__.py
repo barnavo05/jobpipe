@@ -64,6 +64,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    if args.cmd == "verify-companies":
+        return verify_companies()  # needs no database
     if os.environ.get("GITHUB_ACTIONS") == "true" and config.DATABASE_URL.startswith("sqlite"):
         print("DATABASE_URL secret is missing. On GitHub Actions a SQLite file is wiped after every run, "
               "so users and jobs would vanish. Add your Supabase URL as a repository secret.")
