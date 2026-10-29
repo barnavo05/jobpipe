@@ -1,0 +1,31 @@
+name: Daily job alerts
+
+on:
+  schedule:
+    - cron: "47 2 * * *"   # 02:47 UTC = 8:17 AM IST, every day
+  workflow_dispatch: {}      # "Run workflow" button for manual runs
+
+concurrency:
+  group: jobpipe-daily
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-full.txt
+      - run: pip install -r requirements-full.txt
+      - run: python -m pytest -q
+      - run: python -m jobpipe daily
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ADMIN_CHAT_ID: ${{ secrets.ADMIN_CHAT_ID }}
+          ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
+          ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}

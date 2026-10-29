@@ -1,0 +1,40 @@
+# Company career boards to watch. These use official public ATS APIs: free, no key, allowed.
+#
+# How to find a slug: open a company's careers page and look at the job link.
+#   job-boards.greenhouse.io/<slug>/jobs/123   or  boards.greenhouse.io/<slug>  -> greenhouse
+#   jobs.lever.co/<slug>/...                                                     -> lever
+#   jobs.ashbyhq.com/<slug>/...                                                  -> ashby
+#
+# Starter list below: companies with India offices or India-open remote roles.
+# Run `python -m jobpipe verify-companies` to check every slug. Bad slugs are just
+# skipped at runtime, so a wrong guess never breaks the pipeline.
+
+greenhouse:
+  - {slug: databricks, name: Databricks}
+  - {slug: stripe, name: Stripe}
+  - {slug: cloudflare, name: Cloudflare}
+  - {slug: mongodb, name: MongoDB}
+  - {slug: twilio, name: Twilio}
+  - {slug: rubrik, name: Rubrik}
+  - {slug: phonepe, name: PhonePe}
+  - {slug: postman, name: Postman}
+  - {slug: okta, name: Okta}
+  - {slug: elastic, name: Elastic}
+  - {slug: gitlab, name: GitLab}
+  - {slug: samsara, name: Samsara}
+  - {slug: intuit, name: Intuit}
+  - {slug: coinbase, name: Coinbase}
+  - {slug: zscaler, name: Zscaler}
+
+lever:
+  - {slug: meesho, name: Meesho}
+  - {slug: cred, name: CRED}
+  - {slug: paytm, name: Paytm}
+  - {slug: zeta, name: Zeta}
+  - {slug: highlevel, name: HighLevel}
+
+ashby:
+  - {slug: deel, name: Deel}
+  - {slug: zepto, name: Zepto}
+  - {slug: sarvam, name: Sarvam AI}
+  - {slug: plaid, name: Plaid}
