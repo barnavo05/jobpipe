@@ -59,3 +59,7 @@ JOB_LOOKBACK_DAYS = _int("JOB_LOOKBACK_DAYS", 3)  # only alert on recently fetch
 JOB_RETENTION_DAYS = _int("JOB_RETENTION_DAYS", 30)
 
 COMPANIES_FILE = Path(_env("COMPANIES_FILE", str(ROOT / "config" / "companies.yaml")))
+
+# Supabase "Direct connection" URLs are IPv6 only and fail on GitHub runners.
+# Set this to your session pooler host and direct URLs get rewritten automatically.
+SUPABASE_POOLER_HOST = _env("SUPABASE_POOLER_HOST")

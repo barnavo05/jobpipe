@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 
@@ -53,7 +54,22 @@ SCHEMA = [
 ]
 
 
+_SUPABASE_DIRECT = re.compile(
+    r"^(?P<scheme>[a-z+]+://)(?P<user>postgres):(?P<pw>.*)@db\.(?P<ref>[a-z0-9]+)\.supabase\.co(?::\d+)?(?P<rest>/.*)?$")
+
+
+def _supabase_direct_to_pooler(url: str) -> str:
+    """Supabase's "Direct connection" URL is IPv6 only, and GitHub runners are IPv4 only.
+    If SUPABASE_POOLER_HOST is set, quietly rewrite a direct URL to the session pooler."""
+    pooler = config.SUPABASE_POOLER_HOST
+    m = _SUPABASE_DIRECT.match(url)
+    if not (pooler and m):
+        return url
+    return f"{m['scheme']}postgres.{m['ref']}:{m['pw']}@{pooler}:5432{m['rest'] or '/postgres'}"
+
+
 def _normalize_url(url: str) -> str:
+    url = _supabase_direct_to_pooler(url)
     # Supabase hands out postgres:// or postgresql:// URLs; use the psycopg v3 driver.
     for prefix in ("postgres://", "postgresql://"):
         if url.startswith(prefix):
