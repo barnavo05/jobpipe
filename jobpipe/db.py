@@ -55,7 +55,8 @@ SCHEMA = [
 
 
 _SUPABASE_DIRECT = re.compile(
-    r"^(?P<scheme>[a-z+]+://)(?P<user>postgres):(?P<pw>.*)@db\.(?P<ref>[a-z0-9]+)\.supabase\.co(?::\d+)?(?P<rest>/.*)?$")
+    r"^(?P<scheme>[a-z+]+://)(?P<user>postgres(?:\.[a-z0-9]+)?):(?P<pw>[^@]*)@db\.(?P<ref>[a-z0-9]+)\.supabase\.co"
+    r"(?::\d+)?(?:/.*)?$")
 
 
 def _supabase_direct_to_pooler(url: str) -> str:
@@ -65,7 +66,8 @@ def _supabase_direct_to_pooler(url: str) -> str:
     m = _SUPABASE_DIRECT.match(url)
     if not (pooler and m):
         return url
-    return f"{m['scheme']}postgres.{m['ref']}:{m['pw']}@{pooler}:5432{m['rest'] or '/postgres'}"
+    # Anything after the host (even a second pasted address) is dropped; Supabase's db is always "postgres".
+    return f"{m['scheme']}postgres.{m['ref']}:{m['pw']}@{pooler}:5432/postgres"
 
 
 def _normalize_url(url: str) -> str:

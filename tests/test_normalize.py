@@ -67,3 +67,14 @@ def test_supabase_direct_url_rewritten_to_pooler(monkeypatch):
     assert db._normalize_url(pooled) == pooled.replace("postgresql://", "postgresql+psycopg://")
     monkeypatch.setattr(config, "SUPABASE_POOLER_HOST", "")
     assert "db.xpqepcxlethbgmblrlwe" in db._normalize_url(direct)
+
+
+def test_supabase_glued_urls_are_salvaged(monkeypatch):
+    from jobpipe import config, db
+    monkeypatch.setattr(config, "SUPABASE_POOLER_HOST", "aws-1-us-west-2.pooler.supabase.com")
+    want = "postgresql+psycopg://postgres.xpqepcxlethbgmblrlwe:Abc123@aws-1-us-west-2.pooler.supabase.com:5432/postgres"
+    for messy in [
+        "postgresql://postgres:Abc123@db.xpqepcxlethbgmblrlwe.supabase.co:5432/postgres@aws-1-us-west-2.pooler.supabase.com:5432/postgres",
+        "postgresql://postgres.xpqepcxlethbgmblrlwe:Abc123@db.xpqepcxlethbgmblrlwe.supabase.co:5432/postgres@aws-1-us-west-2.pooler.supabase.com:5432/postgres",
+    ]:
+        assert db._normalize_url(messy) == want
