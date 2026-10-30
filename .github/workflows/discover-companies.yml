@@ -1,0 +1,18 @@
+name: Discover company boards
+
+# Run manually. Tries every slug in config/candidates.txt on Greenhouse, Lever and Ashby
+# and prints the ones that exist, with how many India jobs each has.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python -m jobpipe discover-companies config/candidates.txt

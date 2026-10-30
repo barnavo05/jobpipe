@@ -7,6 +7,7 @@
   python -m jobpipe daily              collect from all sources + send digests (manual full run)
   python -m jobpipe digest             send today's digest unless it already went out (what Vercel's timer runs)
   python -m jobpipe verify-companies   check every slug in config/companies.yaml
+  python -m jobpipe discover-companies FILE   try slugs on Greenhouse/Lever/Ashby
   python -m jobpipe set-webhook URL    switch the bot to instant webhook mode (optional)
   python -m jobpipe delete-webhook     switch back to polling
 """
@@ -48,6 +49,34 @@ def verify_companies() -> int:
     return 1 if bad == len(companies) else 0
 
 
+def discover_companies(path: str) -> int:
+    """Try every slug in a text file on Greenhouse, Lever and Ashby; print the ones with India jobs
+    as ready-to-paste companies.yaml lines."""
+    from concurrent.futures import ThreadPoolExecutor
+    from pathlib import Path
+    from .normalize import finalize
+    from .sources import ats
+    slugs = [s.strip().lower() for s in Path(path).read_text().splitlines()
+             if s.strip() and not s.strip().startswith("#")]
+    slugs = list(dict.fromkeys(slugs))
+    tries = [(kind, slug) for slug in slugs for kind in ("greenhouse", "lever", "ashby")]
+
+    def probe(t):
+        kind, slug = t
+        try:
+            jobs = ats.fetch_board(kind, slug, slug)
+        except Exception:
+            return None
+        return kind, slug, len(jobs), sum(1 for j in jobs if ats.india_relevant(finalize(j)))
+
+    with ThreadPoolExecutor(max_workers=12) as pool:
+        found = [r for r in pool.map(probe, tries) if r]
+    print(f"probed {len(slugs)} slugs x 3 platforms, {len(found)} boards exist")
+    for kind, slug, total, india in sorted(found, key=lambda r: -r[3]):
+        print(f"FOUND {kind} {slug} total={total} india={india}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="jobpipe")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -60,6 +89,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("daily")
     sub.add_parser("digest")
     sub.add_parser("verify-companies")
+    p_disc = sub.add_parser("discover-companies")
+    p_disc.add_argument("file")
     p_hook = sub.add_parser("set-webhook")
     p_hook.add_argument("url")
     sub.add_parser("delete-webhook")
@@ -68,6 +99,8 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     if args.cmd == "verify-companies":
         return verify_companies()  # needs no database
+    if args.cmd == "discover-companies":
+        return discover_companies(args.file)
     if os.environ.get("GITHUB_ACTIONS") == "true" and config.DATABASE_URL.startswith("sqlite"):
         print("DATABASE_URL secret is missing. On GitHub Actions a SQLite file is wiped after every run, "
               "so users and jobs would vanish. Add your Supabase URL as a repository secret.")
