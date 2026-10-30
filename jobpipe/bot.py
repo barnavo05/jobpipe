@@ -202,8 +202,8 @@ def handle_message(tg: Telegram, msg: dict) -> None:
     elif cmd == "/privacy":
         tg.send(chat_id, PRIVACY)
     elif cmd == "/stats" and config.ADMIN_CHAT_ID and chat_id == str(config.ADMIN_CHAT_ID):
-        total, active = db.count_users()
-        tg.send(chat_id, f"👥 {total} users, {active} active")
+        from .admin import stats_text
+        tg.send(chat_id, stats_text())
     elif user.state == "awaiting_custom_role" and text and not cmd:
         label = text[:60]
         keywords = [p.strip() for p in label.split(",") if p.strip()][:3]

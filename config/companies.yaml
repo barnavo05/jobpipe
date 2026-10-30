@@ -5,31 +5,78 @@
 #   jobs.lever.co/<slug>/...                                                     -> lever
 #   jobs.ashbyhq.com/<slug>/...                                                  -> ashby
 #
-# Starter list below: companies with India offices or India-open remote roles.
-# Run `python -m jobpipe verify-companies` to check every slug. Bad slugs are just
-# skipped at runtime, so a wrong guess never breaks the pipeline.
+# Every board below was checked on 30 Oct 2026 and had open roles in India.
+# To find more: add slugs to config/candidates.txt and run "Discover company boards" in Actions.
+# Bad slugs are just skipped at runtime, so a wrong guess never breaks the pipeline.
 
 greenhouse:
+  # India-founded / India-heavy
+  - {slug: groww, name: Groww}
+  - {slug: inmobi, name: InMobi}
+  - {slug: glance, name: Glance}
+  - {slug: highradius, name: HighRadius}
+  - {slug: sigmoid, name: Sigmoid}
+  - {slug: druva, name: Druva}
+  - {slug: truefoundry, name: TrueFoundry}
+  - {slug: observeai, name: Observe.AI}
+  - {slug: turing, name: Turing}
+  - {slug: thoughtworks, name: Thoughtworks}
+  # Global companies with India teams
   - {slug: databricks, name: Databricks}
-  - {slug: stripe, name: Stripe}
-  - {slug: cloudflare, name: Cloudflare}
-  - {slug: mongodb, name: MongoDB}
-  - {slug: twilio, name: Twilio}
-  - {slug: rubrik, name: Rubrik}
   - {slug: okta, name: Okta}
-  - {slug: elastic, name: Elastic}
-  - {slug: gitlab, name: GitLab}
-  - {slug: samsara, name: Samsara}
-  - {slug: coinbase, name: Coinbase}
   - {slug: zscaler, name: Zscaler}
+  - {slug: mongodb, name: MongoDB}
+  - {slug: purestorage, name: Pure Storage}
+  - {slug: stripe, name: Stripe}
+  - {slug: rubrik, name: Rubrik}
+  - {slug: gitlab, name: GitLab}
+  - {slug: toast, name: Toast}
+  - {slug: fivetran, name: Fivetran}
+  - {slug: netskope, name: Netskope}
+  - {slug: commvault, name: Commvault}
+  - {slug: elastic, name: Elastic}
+  - {slug: coinbase, name: Coinbase}
+  - {slug: airbnb, name: Airbnb}
+  - {slug: datadog, name: Datadog}
+  - {slug: singlestore, name: SingleStore}
+  - {slug: twilio, name: Twilio}
+  - {slug: samsara, name: Samsara}
+  - {slug: starburst, name: Starburst}
+  - {slug: newrelic, name: New Relic}
+  - {slug: figma, name: Figma}
+  - {slug: anthropic, name: Anthropic}
+  - {slug: mixpanel, name: Mixpanel}
+  - {slug: adyen, name: Adyen}
+  - {slug: yugabyte, name: YugabyteDB}
+  - {slug: vercel, name: Vercel}
+  - {slug: discord, name: Discord}
+  - {slug: brex, name: Brex}
+  - {slug: scaleai, name: Scale AI}
+  - {slug: cloudflare, name: Cloudflare}
+  - {slug: asana, name: Asana}
+  - {slug: cockroachlabs, name: Cockroach Labs}
+  - {slug: dremio, name: Dremio}
 
 lever:
   - {slug: meesho, name: Meesho}
   - {slug: cred, name: CRED}
   - {slug: paytm, name: Paytm}
   - {slug: zeta, name: Zeta}
+  - {slug: fampay, name: FamPay}
+  - {slug: mindtickle, name: Mindtickle}
+  - {slug: pocketfm, name: Pocket FM}
 
 ashby:
-  - {slug: deel, name: Deel}
   - {slug: sarvam, name: Sarvam AI}
-  - {slug: plaid, name: Plaid}
+  - {slug: atlan, name: Atlan}
+  - {slug: bureau, name: Bureau}
+  - {slug: composio, name: Composio}
+  - {slug: supabase, name: Supabase}
+  - {slug: clickhouse, name: ClickHouse}
+  - {slug: snowflake, name: Snowflake}
+  - {slug: posthog, name: PostHog}
+  - {slug: openai, name: OpenAI}
+  - {slug: notion, name: Notion}
+  - {slug: redis, name: Redis}
+  - {slug: amplitude, name: Amplitude}
+  - {slug: zapier, name: Zapier}

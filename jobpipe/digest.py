@@ -50,7 +50,7 @@ def run_once_today(tg=None, use_jobspy: bool = False) -> dict:
         # Freshen the pool first. A failure here must not cost anyone their digest:
         # jobs collected earlier (GitHub runs) are still there.
         try:
-            report["collect"] = collect.run(use_jobspy=use_jobspy)
+            report["collect"] = collect.run(use_jobspy=use_jobspy, kind=f"digest-{when}")
         except Exception as exc:
             log.warning("collect failed, sending from the existing pool: %s", exc)
             report["collect"] = {"error": f"{type(exc).__name__}: {exc}"}

@@ -40,7 +40,7 @@ def keep(job: Job) -> bool:
     return bool(job.title and job.url) and (is_india(job.location) or job.is_remote or not job.location)
 
 
-def run(users: list[User] | None = None, use_jobspy: bool = True) -> dict:
+def run(users: list[User] | None = None, use_jobspy: bool = True, kind: str | None = None) -> dict:
     """use_jobspy=False = only the fast, official sources (company boards + Adzuna).
     That's what the Vercel morning run uses; GitHub adds LinkedIn/Indeed/Naukri."""
     users = users if users is not None else db.active_users()
@@ -58,10 +58,13 @@ def run(users: list[User] | None = None, use_jobspy: bool = True) -> dict:
     queries = build_queries(users, config.MAX_SEARCH_QUERIES)
     report["queries"] = len(queries)
     search_counts: Counter[str] = Counter()
+    scanned = report.get("boards", {}).get("raw", 0)
     for term, loc in queries:
         for source in ((adzuna, jobspy_source) if use_jobspy else (adzuna,)):
             try:
-                found = [j for j in source.search(term, loc) if keep(j)]
+                raw = source.search(term, loc)
+                scanned += len(raw)
+                found = [j for j in raw if keep(j)]
             except Exception as exc:
                 log.warning("%s failed for %r @ %s: %s", source.__name__, term, loc, exc)
                 continue
@@ -73,5 +76,10 @@ def run(users: list[User] | None = None, use_jobspy: bool = True) -> dict:
     report["by_source"] = dict(Counter(j.source for j in all_jobs))
     report["new_jobs"] = db.insert_jobs(all_jobs)
     report["pruned"] = db.prune_jobs()
+    report["scanned"] = scanned
+    try:
+        db.log_run(kind or ("full" if use_jobspy else "boards"), scanned, len(all_jobs), report["new_jobs"])
+    except Exception as exc:  # numbers are nice to have, never worth failing a run over
+        log.warning("could not log run: %s", exc)
     log.info("collected %s jobs, %s new", len(all_jobs), report["new_jobs"])
     return report

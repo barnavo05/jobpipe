@@ -22,14 +22,11 @@ import sys
 from . import bot, collect, config, db, notify
 
 
-def _report(title: str, report: dict) -> None:
+def _report(title: str, report: dict, tell_admin: bool = True) -> None:
     print(f"{title}: {json.dumps(report, default=str)}")
-    if config.ADMIN_CHAT_ID and config.TELEGRAM_BOT_TOKEN:
-        try:
-            from .telegram_api import Telegram
-            Telegram().send(config.ADMIN_CHAT_ID, f"<b>{title}</b>\n<code>{json.dumps(report, default=str, indent=1)[:3500]}</code>")
-        except Exception as exc:  # reporting must never break the run
-            logging.warning("admin report failed: %s", exc)
+    if tell_admin:
+        from .admin import send
+        send(f"<b>{title}</b>\n<code>{json.dumps(report, default=str, indent=1)[:3500]}</code>")
 
 
 def verify_companies() -> int:
@@ -121,7 +118,9 @@ def main(argv: list[str] | None = None) -> int:
         print("bot running, Ctrl+C to stop" if not args.once else "draining updates")
         print(f"handled {bot.poll(once=args.once, tg=tg)} updates")
     elif args.cmd == "collect":
-        _report("collect", collect.run())
+        c = collect.run(kind="github")
+        failed = c.get("boards", {}).get("boards_failed")
+        _report("collect", c, tell_admin=bool(failed))
     elif args.cmd == "notify":
         _report("notify", notify.run(dry_run=args.dry_run))
     elif args.cmd == "daily":
@@ -131,12 +130,15 @@ def main(argv: list[str] | None = None) -> int:
         # Vercel morning timer won't send a second digest on the same day.
         from . import digest
         digest.claim_today()
-        c = collect.run()
+        c = collect.run(kind="manual")
         n = notify.run()
         _report("daily run", {"collect": c, "notify": n})
     elif args.cmd == "digest":
         from . import digest
-        _report("digest", digest.run_once_today())
+        from .admin import digest_line, send
+        r = digest.run_once_today()
+        _report("digest", r, tell_admin=False)
+        send(digest_line(r))
     elif args.cmd == "verify-companies":
         return verify_companies()
     elif args.cmd == "set-webhook":

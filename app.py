@@ -19,7 +19,7 @@ import hmac
 import json
 import os
 
-from jobpipe import bot, config, db, digest
+from jobpipe import admin, bot, config, db, digest
 from jobpipe.telegram_api import Telegram
 
 WEBHOOK_PATH = "/api/telegram"
@@ -62,6 +62,7 @@ def cron_daily(environ, start_response):
         return _respond(start_response, "500 Internal Server Error", b"digest failed, see logs")
     body = json.dumps(report, default=str).encode()
     print(f"cron daily: {body.decode()[:2000]}")
+    admin.send(admin.digest_line(report))  # no-op until ADMIN_CHAT_ID is set
     return _respond(start_response, "200 OK", body)
 
 
