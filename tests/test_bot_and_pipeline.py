@@ -41,7 +41,7 @@ def test_full_signup_flow(tg):
     u = db.get_user(str(CHAT))
     assert u.active and u.state == "ready"
     assert (u.role_key, u.exp_min, u.exp_max, u.locations) == ("data_analyst", 0, 0, ["bengaluru"])
-    assert "all set" in tg.last["text"]
+    assert "all set" in tg.sent[-2]["text"]
 
 
 def test_custom_role_and_commands(tg):
@@ -229,3 +229,15 @@ def test_cron_endpoint_checks_secret_when_set(monkeypatch):
     monkeypatch.setattr(webapp.digest, "run_once_today", lambda tg=None: {"ok": True})
     assert _call_app("/api/cron/daily", headers={"HTTP_AUTHORIZATION": "Bearer nope"})[0].startswith("403")
     assert _call_app("/api/cron/daily", headers={"HTTP_AUTHORIZATION": "Bearer s3cret-value-123456"})[0].startswith("200")
+
+
+def test_new_user_gets_jobs_right_after_signup(tg):
+    _seed_jobs(3, company="First")
+    signup(tg)
+    assert "all set" in tg.sent[-2]["text"]
+    assert "to start with" in tg.last["text"] and tg.last["text"].count("Apply here") == 3
+
+
+def test_new_user_with_no_matches_is_told_search_is_running(tg):
+    signup(tg)
+    assert "searching LinkedIn, Naukri and Indeed" in tg.last["text"]
