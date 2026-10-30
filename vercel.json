@@ -2,7 +2,13 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "app.py": {
-      "excludeFiles": "{tests/**,config/**,.github/**,*.md}"
+      "maxDuration": 300,
+      "excludeFiles": "{tests/**,.github/**,*.md}"
     }
-  }
+  },
+  "crons": [
+    { "path": "/api/cron/daily", "schedule": "0 2 * * *" },
+    { "path": "/api/cron/daily", "schedule": "0 3 * * *" },
+    { "path": "/api/cron/daily", "schedule": "0 4 * * *" }
+  ]
 }
