@@ -2,14 +2,14 @@ name: Daily job alerts
 
 # Timed runs only COLLECT (LinkedIn, Indeed, Naukri + company pages) so jobs are waiting.
 # GitHub's timers are best effort and sometimes skip, so there are several; any one is enough.
-# The digest itself is sent by Vercel's timer each morning (vercel.json).
+# The digests themselves are sent by Vercel's timers, morning and evening (vercel.json).
 # The "Run workflow" button does a full manual run: collect + send digests.
 on:
   schedule:
     - cron: "13 23 * * *"   # 4:43 AM IST
     - cron: "13 1 * * *"    # 6:43 AM IST
     - cron: "13 7 * * *"    # 12:43 PM IST
-    - cron: "13 13 * * *"   # 6:43 PM IST
+    - cron: "13 11 * * *"   # 4:43 PM IST, right before the evening digest
   workflow_dispatch: {}
 
 concurrency:

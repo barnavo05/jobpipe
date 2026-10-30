@@ -34,7 +34,7 @@ HELP = (
     "/resume  turn alerts back on\n"
     "/stop  delete all your data\n"
     "/privacy  what I store about you\n\n"
-    "Alerts land once a day. Tap 👎 on jobs that miss and I'll learn."
+    "Alerts land twice a day, around 8 AM and 6 PM. Tap 👎 on jobs that miss and I'll learn."
 )
 
 PRIVACY = (
@@ -116,7 +116,7 @@ def ask_loc(tg: Telegram, chat_id: str) -> None:
 def finish(tg: Telegram, user: User) -> None:
     user = db.update_user(user.chat_id, state="ready", active=True)
     tg.send(user.chat_id, "You're all set 🎉\n\n" + describe(user) +
-            "\n\nEvery morning around 8 AM you'll get new matches. Send /jobs anytime for more.\n"
+            "\n\nNew matches come every morning (~8 AM) and evening (~6 PM). Send /jobs anytime for more.\n"
             "/help shows everything else.")
     send_jobs_now(tg, user, first_time=True)  # don't make anyone wait till tomorrow
 
@@ -135,12 +135,12 @@ def send_jobs_now(tg: Telegram, user: User, first_time: bool = False) -> None:
                          db.disliked_companies(user.chat_id))
     if not picked and first_time:
         tg.send(user.chat_id, "I'm searching LinkedIn, Naukri and Indeed for your role and cities now 🔎\n\n"
-                              "Your first matches will arrive in a few hours or with tomorrow's morning digest. "
+                              "Your first matches will arrive with the next digest (around 8 AM or 6 PM). "
                               "You can also try /jobs later today.")
         return
     if not picked:
         tg.send(user.chat_id, "You've seen every match I have right now 🙌\n\n"
-                              "Fresh jobs are collected every morning, so check back tomorrow, "
+                              "New jobs come with the next digest (around 8 AM or 6 PM), "
                               "or widen your search with /settings.")
         return
     text, keyboard = build_digest(user, picked)
@@ -177,7 +177,7 @@ def handle_message(tg: Telegram, msg: dict) -> None:
     elif cmd == "/resume":
         if profile_complete(user):
             db.update_user(chat_id, active=True)
-            tg.send(chat_id, "Back on ✅ You'll get the next daily batch.")
+            tg.send(chat_id, "Back on ✅ You'll get the next digest (around 8 AM or 6 PM).")
         else:
             ask_role(tg, user, first_time=False)
     elif cmd == "/stop":

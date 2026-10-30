@@ -6,7 +6,7 @@ JobPipe checks company career pages and job portals every day, matches what it f
 
 Runs 100% free: GitHub Actions + Supabase free tier + Telegram bot.
 
-**Try it:** [t.me/jobpipe_alerts_bot](https://t.me/jobpipe_alerts_bot). Set up in 20 seconds, then get a digest every morning or send `/jobs` anytime.
+**Try it:** [t.me/jobpipe_alerts_bot](https://t.me/jobpipe_alerts_bot). Set up in 20 seconds, get your first matches instantly, then a digest every morning and evening, or send `/jobs` anytime.
 
 ---
 
@@ -22,11 +22,11 @@ Runs 100% free: GitHub Actions + Supabase free tier + Telegram bot.
  │        ↓ clean, detect city + experience, dedupe             │
  │ 2. STORE   Supabase Postgres (jobs, users, sent, feedback)   │
  └──────────────────────────────────────────────────────────────┘
- every morning ~7:30 to 8:30 AM IST (Vercel timer, reliable)
+ twice a day, ~8 AM and ~6 PM IST (Vercel timers, reliable)
  ┌──────────────────────────────────────────────────────────────┐
  │ 3. MATCH   role + experience + city + excludes, ranked       │
  │ 4. NOTIFY  one Telegram digest per user, top 10 new jobs     │
- │            (once per day, guaranteed, with 2 backup timers)  │
+ │            (each sent once, guaranteed, with backup timers)  │
  └──────────────────────────────────────────────────────────────┘
  anytime: instant bot replies (Vercel webhook), /jobs on demand
 ```
@@ -84,7 +84,7 @@ Sign up at [developer.adzuna.com](https://developer.adzuna.com), create an app, 
 3. In Actions, run **Telegram bot replies** manually (Run workflow button). Your bot answers. Finish the signup by tapping the buttons; each tap gets processed on the next run, so hit Run workflow again between taps while testing (or do Step 7 for instant replies).
 4. Run **Daily job alerts** manually. Within a few minutes you get your first digest.
 
-From now on it runs by itself every morning.
+From now on it runs by itself, morning and evening.
 
 ### Step 6: Check the company list
 Run the **Check company boards** workflow. It tests every slug in `config/companies.yaml` and prints how many India jobs each has. Remove the ones that fail, and add companies you care about:
@@ -145,8 +145,8 @@ jobpipe/
   bot.py                 Telegram signup flow and commands
   notify.py              daily digest
   db.py                  SQLite/Postgres storage
-app.py                   Vercel app: instant replies + morning digest timer
-  digest.py              once-a-day digest guard
+app.py                   Vercel app: instant replies + digest timers
+  digest.py              morning/evening digest, each sent exactly once
 config/companies.yaml    company boards to watch
 .github/workflows/       daily run, bot polling, board checker, reply mode switch
 ```
