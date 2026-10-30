@@ -104,7 +104,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     try:
         from sqlalchemy.engine import make_url
-        print("database:", make_url(db._normalize_url(config.DATABASE_URL)).render_as_string(hide_password=True))
+        u = make_url(db._normalize_url(config.DATABASE_URL))
+        print("database:", u.get_backend_name(), "on", (u.host or "local file"))  # no user or password in public logs
     except Exception as exc:
         print(f"database URL could not be parsed: {type(exc).__name__}")
     db.init_db()
