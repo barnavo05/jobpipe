@@ -13,7 +13,7 @@ Runs 100% free: GitHub Actions + Supabase free tier + Telegram bot.
 ## How it works
 
 ```
- every day 8:17 AM IST (GitHub Actions)
+ a few times a day (GitHub Actions, best effort)
  ┌──────────────────────────────────────────────────────────────┐
  │ 1. COLLECT                                                   │
  │    Company boards (Greenhouse, Lever, Ashby)  official APIs  │
@@ -21,10 +21,14 @@ Runs 100% free: GitHub Actions + Supabase free tier + Telegram bot.
  │    Indeed, LinkedIn, Naukri                   via JobSpy     │
  │        ↓ clean, detect city + experience, dedupe             │
  │ 2. STORE   Supabase Postgres (jobs, users, sent, feedback)   │
+ └──────────────────────────────────────────────────────────────┘
+ every morning ~7:30 to 8:30 AM IST (Vercel timer, reliable)
+ ┌──────────────────────────────────────────────────────────────┐
  │ 3. MATCH   role + experience + city + excludes, ranked       │
  │ 4. NOTIFY  one Telegram digest per user, top 10 new jobs     │
+ │            (once per day, guaranteed, with 2 backup timers)  │
  └──────────────────────────────────────────────────────────────┘
- every 10 min: bot replies to signups and button taps
+ anytime: instant bot replies (Vercel webhook), /jobs on demand
 ```
 
 **The trick that keeps it free:** it searches once per *(role, city)* combo, not once per user. 500 people wanting "Data Analyst in Bengaluru" is 1 search, not 500.
@@ -122,6 +126,7 @@ Without `DATABASE_URL` it uses a local SQLite file, so you can play with zero se
 
 ## Free tier gotchas (read these)
 
+- **GitHub's timers are best effort.** Under load GitHub delays or skips scheduled runs, sometimes for hours. That's why the digest is sent by Vercel's timer, and GitHub only collects (several times a day, so a skipped run costs nothing).
 - **GitHub pauses scheduled workflows** in public repos after 60 days with no commits. Push any small change every month or so (or GitHub emails you, click re-enable).
 - **Supabase pauses** projects after a week of no activity. The daily run hits the DB, so this never triggers while it's running.
 - **LinkedIn / Indeed / Naukri** don't offer free APIs and block scrapers aggressively. JobSpy failures are logged and skipped, never fatal. Keep `MAX_SEARCH_QUERIES` modest. Company boards and Adzuna are the reliable backbone.
@@ -140,7 +145,8 @@ jobpipe/
   bot.py                 Telegram signup flow and commands
   notify.py              daily digest
   db.py                  SQLite/Postgres storage
-app.py                   optional Vercel webhook (instant replies)
+app.py                   Vercel app: instant replies + morning digest timer
+  digest.py              once-a-day digest guard
 config/companies.yaml    company boards to watch
 .github/workflows/       daily run, bot polling, board checker, reply mode switch
 ```

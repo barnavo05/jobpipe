@@ -1,9 +1,16 @@
 name: Daily job alerts
 
+# Timed runs only COLLECT (LinkedIn, Indeed, Naukri + company pages) so jobs are waiting.
+# GitHub's timers are best effort and sometimes skip, so there are several; any one is enough.
+# The digest itself is sent by Vercel's timer each morning (vercel.json).
+# The "Run workflow" button does a full manual run: collect + send digests.
 on:
   schedule:
-    - cron: "47 2 * * *"   # 02:47 UTC = 8:17 AM IST, every day
-  workflow_dispatch: {}      # "Run workflow" button for manual runs
+    - cron: "13 23 * * *"   # 4:43 AM IST
+    - cron: "13 1 * * *"    # 6:43 AM IST
+    - cron: "13 7 * * *"    # 12:43 PM IST
+    - cron: "13 13 * * *"   # 6:43 PM IST
+  workflow_dispatch: {}
 
 concurrency:
   group: jobpipe-daily
@@ -22,7 +29,7 @@ jobs:
           cache-dependency-path: requirements-full.txt
       - run: pip install -r requirements-full.txt
       - run: python -m pytest -q
-      - run: python -m jobpipe daily
+      - run: python -m jobpipe ${{ github.event_name == 'schedule' && 'collect' || 'daily' }}
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

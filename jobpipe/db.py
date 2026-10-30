@@ -268,6 +268,19 @@ def kv_get(key: str, default: str | None = None) -> str | None:
     return row[0] if row else default
 
 
+def kv_claim(key: str, value: str = "1") -> bool:
+    """Atomically take a one-time slot. True only for the first caller, ever."""
+    with engine().begin() as conn:
+        res = conn.execute(text("INSERT INTO kv (key, value) VALUES (:k, :v) ON CONFLICT (key) DO NOTHING"),
+                           {"k": key, "v": value})
+    return (res.rowcount or 0) == 1
+
+
+def kv_delete(key: str) -> None:
+    with engine().begin() as conn:
+        conn.execute(text("DELETE FROM kv WHERE key = :k"), {"k": key})
+
+
 def kv_set(key: str, value: str) -> None:
     with engine().begin() as conn:
         conn.execute(text("INSERT INTO kv (key, value) VALUES (:k, :v) "

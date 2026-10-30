@@ -1,4 +1,7 @@
-"""OPTIONAL instant-reply mode: the Telegram webhook, served by Vercel for free.
+"""Vercel app: instant Telegram replies + the reliable morning digest timer.
+
+/api/telegram    Telegram webhook (instant replies)
+/api/cron/daily  hit by Vercel's daily timers (vercel.json); sends the digest once a day
 
 Vercel finds this file on its own (a top-level `app` in app.py) and routes every
 request here. Telegram POSTs each new message to /api/telegram; we check it really
@@ -14,11 +17,14 @@ from __future__ import annotations
 
 import hmac
 import json
+import os
 
-from jobpipe import bot, config, db
+from jobpipe import bot, config, db, digest
 from jobpipe.telegram_api import Telegram
 
 WEBHOOK_PATH = "/api/telegram"
+CRON_PATH = "/api/cron/daily"
+MORNING_IST = range(7, 12)  # without CRON_SECRET, the digest can only be triggered 7:00 to 11:59 IST
 _db_ready = False
 
 
@@ -27,11 +33,43 @@ def _respond(start_response, status: str, body: bytes = b"ok"):
     return [body]
 
 
-def app(environ, start_response):
+def _ensure_db():
     global _db_ready
+    if not _db_ready:
+        db.init_db()
+        _db_ready = True
+
+
+def _cron_allowed(environ) -> bool:
+    """Vercel sends `Authorization: Bearer $CRON_SECRET` when that env var is set.
+    Without it, only allow the morning window: the digest runs once a day anyway,
+    so the worst a stranger can do is trigger it a little early."""
+    secret = os.environ.get("CRON_SECRET", "")
+    if secret:
+        return hmac.compare_digest(environ.get("HTTP_AUTHORIZATION") or "", f"Bearer {secret}")
+    return digest.now_ist().hour in MORNING_IST
+
+
+def cron_daily(environ, start_response):
+    if not _cron_allowed(environ):
+        return _respond(start_response, "403 Forbidden", b"outside the morning window")
+    try:
+        _ensure_db()
+        report = digest.run_once_today(tg=Telegram())
+    except Exception as exc:
+        print(f"cron error: {type(exc).__name__}: {exc}")
+        return _respond(start_response, "500 Internal Server Error", b"digest failed, see logs")
+    body = json.dumps(report, default=str).encode()
+    print(f"cron daily: {body.decode()[:2000]}")
+    return _respond(start_response, "200 OK", body)
+
+
+def app(environ, start_response):
     method = environ.get("REQUEST_METHOD", "GET")
     path = (environ.get("PATH_INFO") or "/").rstrip("/") or "/"
 
+    if method == "GET" and path == CRON_PATH:
+        return cron_daily(environ, start_response)
     if method == "GET":
         return _respond(start_response, "200 OK", b"JobPipe webhook is alive")
     if method != "POST" or path != WEBHOOK_PATH:
@@ -45,9 +83,7 @@ def app(environ, start_response):
     try:
         length = int(environ.get("CONTENT_LENGTH") or 0)
         update = json.loads(environ["wsgi.input"].read(length) or b"{}")
-        if not _db_ready:
-            db.init_db()
-            _db_ready = True
+        _ensure_db()
         bot.handle_update(Telegram(), update)
     except Exception as exc:  # always 200 so Telegram doesn't retry the same update forever
         print(f"webhook error: {type(exc).__name__}: {exc}")

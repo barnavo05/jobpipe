@@ -40,7 +40,9 @@ def keep(job: Job) -> bool:
     return bool(job.title and job.url) and (is_india(job.location) or job.is_remote or not job.location)
 
 
-def run(users: list[User] | None = None) -> dict:
+def run(users: list[User] | None = None, use_jobspy: bool = True) -> dict:
+    """use_jobspy=False = only the fast, official sources (company boards + Adzuna).
+    That's what the Vercel morning run uses; GitHub adds LinkedIn/Indeed/Naukri."""
     users = users if users is not None else db.active_users()
     all_jobs: list[Job] = []
     report: dict = {}
@@ -57,7 +59,7 @@ def run(users: list[User] | None = None) -> dict:
     report["queries"] = len(queries)
     search_counts: Counter[str] = Counter()
     for term, loc in queries:
-        for source in (adzuna, jobspy_source):
+        for source in ((adzuna, jobspy_source) if use_jobspy else (adzuna,)):
             try:
                 found = [j for j in source.search(term, loc) if keep(j)]
             except Exception as exc:

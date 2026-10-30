@@ -4,7 +4,8 @@
   python -m jobpipe bot [--once]       run the Telegram bot (polling)
   python -m jobpipe collect            fetch jobs from all sources
   python -m jobpipe notify [--dry-run] send daily digests
-  python -m jobpipe daily              bot --once, collect, notify (what the cron runs)
+  python -m jobpipe daily              collect from all sources + send digests (manual full run)
+  python -m jobpipe digest             send today's digest unless it already went out (what Vercel's timer runs)
   python -m jobpipe verify-companies   check every slug in config/companies.yaml
   python -m jobpipe set-webhook URL    switch the bot to instant webhook mode (optional)
   python -m jobpipe delete-webhook     switch back to polling
@@ -57,6 +58,7 @@ def main(argv: list[str] | None = None) -> int:
     p_notify = sub.add_parser("notify")
     p_notify.add_argument("--dry-run", action="store_true", help="print digests instead of sending")
     sub.add_parser("daily")
+    sub.add_parser("digest")
     sub.add_parser("verify-companies")
     p_hook = sub.add_parser("set-webhook")
     p_hook.add_argument("url")
@@ -92,9 +94,16 @@ def main(argv: list[str] | None = None) -> int:
     elif args.cmd == "daily":
         # Bot replies are handled by the bot workflow / webhook only, so two
         # processes never read the same Telegram updates.
+        # Manual full run (all sources). Also takes today's digest slot, so the
+        # Vercel morning timer won't send a second digest on the same day.
+        from . import digest
+        digest.claim_today()
         c = collect.run()
         n = notify.run()
         _report("daily run", {"collect": c, "notify": n})
+    elif args.cmd == "digest":
+        from . import digest
+        _report("digest", digest.run_once_today())
     elif args.cmd == "verify-companies":
         return verify_companies()
     elif args.cmd == "set-webhook":

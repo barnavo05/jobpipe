@@ -153,3 +153,79 @@ def test_webhook_secret_is_derived_from_token():
     token = "123:abc"
     want = hashlib.sha256(f"jobpipe-webhook:{token}".encode()).hexdigest()[:48]
     assert len(want) == 48 and want.isalnum()
+
+
+# ---------------------------------------------------------------- reliable morning digest
+
+def test_kv_claim_is_one_time():
+    assert db.kv_claim("digest:2026-10-30") is True
+    assert db.kv_claim("digest:2026-10-30") is False
+    db.kv_delete("digest:2026-10-30")
+    assert db.kv_claim("digest:2026-10-30") is True
+
+
+def test_digest_sends_once_per_day(tg, monkeypatch):
+    from jobpipe import digest
+    calls = {"collect": 0, "notify": 0}
+    monkeypatch.setattr(collect, "run", lambda **k: calls.__setitem__("collect", calls["collect"] + 1) or {"use_jobspy": k.get("use_jobspy")})
+    monkeypatch.setattr(notify, "run", lambda tg=None: calls.__setitem__("notify", calls["notify"] + 1) or {})
+    first = digest.run_once_today(tg=tg)
+    second = digest.run_once_today(tg=tg)
+    assert calls == {"collect": 1, "notify": 1}
+    assert first["collect"] == {"use_jobspy": False}  # Vercel run = fast official sources only
+    assert "skipped" in second
+
+
+def test_digest_still_sends_when_collect_fails(tg, monkeypatch):
+    from jobpipe import digest
+    def boom(**k):
+        raise RuntimeError("boards down")
+    monkeypatch.setattr(collect, "run", boom)
+    monkeypatch.setattr(notify, "run", lambda tg=None: {"notified": 1})
+    report = digest.run_once_today(tg=tg)
+    assert report["notify"] == {"notified": 1} and "error" in report["collect"]
+
+
+def test_digest_frees_the_slot_if_sending_crashes(tg, monkeypatch):
+    import pytest
+    from jobpipe import digest
+    monkeypatch.setattr(collect, "run", lambda **k: {})
+    def boom(tg=None):
+        raise RuntimeError("telegram down")
+    monkeypatch.setattr(notify, "run", boom)
+    with pytest.raises(RuntimeError):
+        digest.run_once_today(tg=tg)
+    assert db.kv_claim(digest.slot_key()) is True  # a backup timer can retry
+
+
+def _call_app(path, method="GET", headers=None):
+    import io
+    import app as webapp
+    env = {"REQUEST_METHOD": method, "PATH_INFO": path, "CONTENT_LENGTH": "0", "wsgi.input": io.BytesIO(b"")}
+    env.update(headers or {})
+    out = {}
+    body = b"".join(webapp.app(env, lambda s, h: out.setdefault("status", s)))
+    return out["status"], body
+
+
+def test_cron_endpoint_only_in_the_morning_without_secret(monkeypatch):
+    from datetime import datetime
+    import app as webapp
+    from jobpipe import digest
+    monkeypatch.delenv("CRON_SECRET", raising=False)
+    monkeypatch.setattr(webapp, "Telegram", lambda: None)
+    monkeypatch.setattr(webapp.digest, "run_once_today", lambda tg=None: {"ok": True})
+    monkeypatch.setattr(digest, "now_ist", lambda: datetime(2026, 10, 30, 2, 0, tzinfo=digest.IST))
+    assert _call_app("/api/cron/daily")[0].startswith("403")
+    monkeypatch.setattr(digest, "now_ist", lambda: datetime(2026, 10, 30, 8, 5, tzinfo=digest.IST))
+    status, body = _call_app("/api/cron/daily")
+    assert status.startswith("200") and b'"ok": true' in body
+
+
+def test_cron_endpoint_checks_secret_when_set(monkeypatch):
+    import app as webapp
+    monkeypatch.setenv("CRON_SECRET", "s3cret-value-123456")
+    monkeypatch.setattr(webapp, "Telegram", lambda: None)
+    monkeypatch.setattr(webapp.digest, "run_once_today", lambda tg=None: {"ok": True})
+    assert _call_app("/api/cron/daily", headers={"HTTP_AUTHORIZATION": "Bearer nope"})[0].startswith("403")
+    assert _call_app("/api/cron/daily", headers={"HTTP_AUTHORIZATION": "Bearer s3cret-value-123456"})[0].startswith("200")
