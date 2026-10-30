@@ -54,14 +54,15 @@ def search(term: str, location: str | None) -> list[Job]:
         log.warning("python-jobspy not installed, skipping")
         return []
     remote = (location or "").lower() == "remote"
-    loc = "India" if remote or not location else f"{location}, India"
+    anywhere = not location or location.lower() == "india"
+    loc = "India" if remote or anywhere else f"{location}, India"
     jobs: list[Job] = []
     # One site per call so a block on LinkedIn doesn't kill Indeed results.
     for site in config.JOBSPY_SITES:
         try:
             df = scrape_jobs(
                 site_name=[site], search_term=term,
-                location=(location if site == "naukri" and location and not remote else loc),
+                location=(location if site == "naukri" and not (remote or anywhere) else loc),
                 is_remote=remote, results_wanted=config.JOBSPY_RESULTS,
                 hours_old=config.HOURS_OLD, country_indeed="India", verbose=0,
             )
