@@ -87,7 +87,7 @@ Sign up at [developer.adzuna.com](https://developer.adzuna.com), create an app, 
 From now on it runs by itself, morning and evening.
 
 ### Step 6: Check the company list
-Run the **Check company boards** workflow. It tests every slug in `config/companies.yaml` and prints how many India jobs each has. Remove the ones that fail, and add companies you care about:
+Run the **Check company boards** workflow. It tests every slug in `config/companies.yaml` and prints how many India jobs each has. To find new ones in bulk, add guesses to `config/candidates.txt` and run **Discover company boards**: it tries each on Greenhouse, Lever and Ashby. To add one by hand:
 
 - `job-boards.greenhouse.io/<slug>` → add under `greenhouse:`
 - `jobs.lever.co/<slug>` → under `lever:`
@@ -127,7 +127,7 @@ Without `DATABASE_URL` it uses a local SQLite file, so you can play with zero se
 ## Free tier gotchas (read these)
 
 - **GitHub's timers are best effort.** Under load GitHub delays or skips scheduled runs, sometimes for hours. That's why the digest is sent by Vercel's timer, and GitHub only collects (several times a day, so a skipped run costs nothing).
-- **GitHub pauses scheduled workflows** in public repos after 60 days with no commits. Push any small change every month or so (or GitHub emails you, click re-enable).
+- **GitHub pauses scheduled workflows** in public repos after 60 days with no commits. The **Keep alive** workflow handles this: twice a month it makes a tiny commit if the repo has been quiet for 40+ days.
 - **Supabase pauses** projects after a week of no activity. The daily run hits the DB, so this never triggers while it's running.
 - **LinkedIn / Indeed / Naukri** don't offer free APIs and block scrapers aggressively. JobSpy failures are logged and skipped, never fatal. Keep `MAX_SEARCH_QUERIES` modest. Company boards and Adzuna are the reliable backbone.
 - **Telegram** allows roughly 30 messages a second. One digest per user per day keeps you far below that even at thousands of users.
@@ -147,9 +147,16 @@ jobpipe/
   db.py                  SQLite/Postgres storage
 app.py                   Vercel app: instant replies + digest timers
   digest.py              morning/evening digest, each sent exactly once
-config/companies.yaml    company boards to watch
+config/companies.yaml    company boards to watch (64, checked Oct 2026)
+config/candidates.txt    slugs to try with "Discover company boards"
 .github/workflows/       daily run, bot polling, board checker, reply mode switch
 ```
+
+## Owner tools
+
+- `/stats` (only works from the `ADMIN_CHAT_ID` chat): users, listings scanned this week, jobs sent, 👎 count
+- With `ADMIN_CHAT_ID` set on Vercel, you also get a one-line report after each morning and evening digest
+- Every collection run is logged to the `runs` table, so the numbers are real, not estimates
 
 ## Privacy
 

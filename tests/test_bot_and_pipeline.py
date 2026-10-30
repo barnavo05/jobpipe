@@ -279,3 +279,42 @@ def test_evening_digest_header():
     u = User(chat_id="1", role_label="Data Analyst")
     j = finalize(Job(source="lever", title="Data Analyst", company="A", location="Pune", url="https://a"))
     assert "for you this evening" in build_digest(u, [j], "this evening")[0]
+
+
+# ---------------------------------------------------------------- usage numbers + owner reports
+
+def test_runs_are_logged_and_counted(tg, monkeypatch, tmp_path):
+    companies = tmp_path / "c.yaml"
+    companies.write_text("greenhouse:\n  - {slug: acme, name: Acme}\n")
+    monkeypatch.setattr(config, "COMPANIES_FILE", companies)
+    monkeypatch.setattr(ats, "fetch_board", _fake_board)
+    monkeypatch.setattr(adzuna, "search", lambda term, loc: [])
+    monkeypatch.setattr(jobspy_source, "search", lambda term, loc: [])
+    signup(tg)
+    report = collect.run(kind="test")
+    assert report["scanned"] == 3  # 3 raw board listings, before the India filter
+    s = db.stats()
+    assert s["scanned_7d"] == 3 and s["users"] == 1 and s["active_users"] == 1
+    assert s["jobs_in_pool"] == report["new_jobs"] == 2
+
+
+def test_stats_command_is_owner_only(tg, monkeypatch):
+    monkeypatch.setattr(config, "ADMIN_CHAT_ID", str(CHAT))
+    signup(tg)
+    bot.handle_update(tg, msg("/stats"))
+    assert "JobPipe stats" in tg.last["text"] and "Users: <b>1</b>" in tg.last["text"]
+    bot.handle_update(tg, msg("/stats", chat=999))
+    assert "JobPipe stats" not in tg.last["text"]
+
+
+def test_digest_line():
+    from jobpipe.admin import digest_line
+    line = digest_line({"period": "pm", "collect": {"new_jobs": 12}, "notify": {"jobs_sent": 24, "notified": 3, "users": 5}})
+    assert line == "✅ Evening digest: sent 24 jobs to 3 of 5 users · 12 new jobs found"
+    assert digest_line({"period": "am", "skipped": "digest already sent"}) == ""
+
+
+def test_admin_send_is_quiet_without_chat_id(monkeypatch):
+    from jobpipe import admin
+    monkeypatch.setattr(config, "ADMIN_CHAT_ID", "")
+    admin.send("hello")  # must not raise or try to reach Telegram

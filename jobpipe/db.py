@@ -51,6 +51,14 @@ SCHEMA = [
         PRIMARY KEY (chat_id, uid)
     )""",
     "CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT)",
+    """CREATE TABLE IF NOT EXISTS runs (
+        ran_at TEXT,
+        kind TEXT,
+        scanned INTEGER,
+        kept INTEGER,
+        new_jobs INTEGER
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_runs_ran_at ON runs (ran_at)",
 ]
 
 
@@ -266,6 +274,34 @@ def kv_get(key: str, default: str | None = None) -> str | None:
     with engine().connect() as conn:
         row = conn.execute(text("SELECT value FROM kv WHERE key = :k"), {"k": key}).first()
     return row[0] if row else default
+
+
+# ---------------------------------------------------------------- usage numbers
+
+def log_run(kind: str, scanned: int, kept: int, new_jobs: int) -> None:
+    with engine().begin() as conn:
+        conn.execute(text("INSERT INTO runs (ran_at, kind, scanned, kept, new_jobs) VALUES (:t, :k, :s, :p, :n)"),
+                     {"t": utcnow_iso(), "k": kind, "s": scanned, "p": kept, "n": new_jobs})
+
+
+def stats() -> dict:
+    """Headline numbers for /stats, reports and your resume."""
+    week = (datetime.now(timezone.utc) - timedelta(days=7)).replace(microsecond=0).isoformat()
+    day = (datetime.now(timezone.utc) - timedelta(days=1)).replace(microsecond=0).isoformat()
+    q = {
+        "users": "SELECT COUNT(*) FROM users",
+        "active_users": "SELECT COUNT(*) FROM users WHERE active = 1",
+        "new_users_7d": "SELECT COUNT(*) FROM users WHERE created_at >= :week",
+        "jobs_in_pool": "SELECT COUNT(*) FROM jobs",
+        "scanned_7d": "SELECT COALESCE(SUM(scanned), 0) FROM runs WHERE ran_at >= :week",
+        "new_jobs_7d": "SELECT COALESCE(SUM(new_jobs), 0) FROM runs WHERE ran_at >= :week",
+        "sent_24h": "SELECT COUNT(*) FROM sent WHERE sent_at >= :day",
+        "sent_7d": "SELECT COUNT(*) FROM sent WHERE sent_at >= :week",
+        "sent_total": "SELECT COUNT(*) FROM sent",
+        "thumbs_down": "SELECT COUNT(*) FROM sent WHERE feedback = -1",
+    }
+    with engine().connect() as conn:
+        return {k: int(conn.execute(text(sql), {"week": week, "day": day}).scalar_one() or 0) for k, sql in q.items()}
 
 
 def kv_claim(key: str, value: str = "1") -> bool:

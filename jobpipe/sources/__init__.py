@@ -15,6 +15,10 @@ import requests
 log = logging.getLogger("jobpipe.sources")
 
 _session = requests.Session()
+# Boards are fetched in parallel; give the pool room for every worker.
+_adapter = requests.adapters.HTTPAdapter(pool_connections=20, pool_maxsize=20)
+_session.mount("https://", _adapter)
+_session.mount("http://", _adapter)
 _session.headers.update({"User-Agent": "JobPipe/0.1 (+https://github.com/; free job alerts)", "Accept": "application/json"})
 
 

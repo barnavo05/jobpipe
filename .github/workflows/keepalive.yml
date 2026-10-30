@@ -1,0 +1,33 @@
+name: Keep alive
+
+# GitHub turns off scheduled workflows in a repo with no activity for 60 days.
+# Twice a month this checks the last commit; if the repo has been quiet for 40+ days,
+# it makes one tiny commit so job collection never gets switched off.
+on:
+  schedule:
+    - cron: "37 4 1,15 * *"   # 1st and 15th of the month, 10:07 AM IST
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Commit only if the repo has been idle
+        run: |
+          last=$(git log -1 --format=%ct)
+          idle_days=$(( ($(date +%s) - last) / 86400 ))
+          echo "last commit was $idle_days days ago"
+          if [ "$idle_days" -lt 40 ]; then
+            echo "recent activity, nothing to do"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          date -u +%Y-%m-%dT%H:%M:%SZ > .github/keepalive
+          git add .github/keepalive
+          git commit -m "keepalive: repo idle for $idle_days days"
+          git push
