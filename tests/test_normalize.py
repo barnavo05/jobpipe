@@ -60,21 +60,21 @@ def test_finalize_fills_fields():
 def test_supabase_direct_url_rewritten_to_pooler(monkeypatch):
     from jobpipe import config, db
     monkeypatch.setattr(config, "SUPABASE_POOLER_HOST", "aws-1-us-west-2.pooler.supabase.com")
-    direct = "postgresql://postgres:Abc123@db.xpqepcxlethbgmblrlwe.supabase.co:5432/postgres"
+    direct = "postgresql://postgres:Abc123@db.exampleprojectref123.supabase.co:5432/postgres"
     assert db._normalize_url(direct) == (
-        "postgresql+psycopg://postgres.xpqepcxlethbgmblrlwe:Abc123@aws-1-us-west-2.pooler.supabase.com:5432/postgres")
-    pooled = "postgresql://postgres.xpqepcxlethbgmblrlwe:Abc123@aws-1-us-west-2.pooler.supabase.com:5432/postgres"
+        "postgresql+psycopg://postgres.exampleprojectref123:Abc123@aws-1-us-west-2.pooler.supabase.com:5432/postgres")
+    pooled = "postgresql://postgres.exampleprojectref123:Abc123@aws-1-us-west-2.pooler.supabase.com:5432/postgres"
     assert db._normalize_url(pooled) == pooled.replace("postgresql://", "postgresql+psycopg://")
     monkeypatch.setattr(config, "SUPABASE_POOLER_HOST", "")
-    assert "db.xpqepcxlethbgmblrlwe" in db._normalize_url(direct)
+    assert "db.exampleprojectref123" in db._normalize_url(direct)
 
 
 def test_supabase_glued_urls_are_salvaged(monkeypatch):
     from jobpipe import config, db
     monkeypatch.setattr(config, "SUPABASE_POOLER_HOST", "aws-1-us-west-2.pooler.supabase.com")
-    want = "postgresql+psycopg://postgres.xpqepcxlethbgmblrlwe:Abc123@aws-1-us-west-2.pooler.supabase.com:5432/postgres"
+    want = "postgresql+psycopg://postgres.exampleprojectref123:Abc123@aws-1-us-west-2.pooler.supabase.com:5432/postgres"
     for messy in [
-        "postgresql://postgres:Abc123@db.xpqepcxlethbgmblrlwe.supabase.co:5432/postgres@aws-1-us-west-2.pooler.supabase.com:5432/postgres",
-        "postgresql://postgres.xpqepcxlethbgmblrlwe:Abc123@db.xpqepcxlethbgmblrlwe.supabase.co:5432/postgres@aws-1-us-west-2.pooler.supabase.com:5432/postgres",
+        "postgresql://postgres:Abc123@db.exampleprojectref123.supabase.co:5432/postgres@aws-1-us-west-2.pooler.supabase.com:5432/postgres",
+        "postgresql://postgres.exampleprojectref123:Abc123@db.exampleprojectref123.supabase.co:5432/postgres@aws-1-us-west-2.pooler.supabase.com:5432/postgres",
     ]:
         assert db._normalize_url(messy) == want

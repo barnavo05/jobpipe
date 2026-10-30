@@ -76,7 +76,7 @@ def run(tg: Telegram | None = None, dry_run: bool = False, when: str = "today") 
             db.update_user(user.chat_id, active=False)
             report["blocked"] += 1
         except TelegramError as exc:
-            log.warning("send to %s failed: %s", user.chat_id, exc)
+            log.warning("send to user ...%s failed: %s", str(user.chat_id)[-3:], exc)
             report["errors"] += 1
         time.sleep(0.05)  # stay well under Telegram's ~30 msg/sec
     return report

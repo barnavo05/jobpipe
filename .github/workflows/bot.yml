@@ -13,6 +13,9 @@ concurrency:
   group: jobpipe-bot
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   poll:
     runs-on: ubuntu-latest

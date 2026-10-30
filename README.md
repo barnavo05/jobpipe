@@ -98,7 +98,7 @@ Tip: this list is the most reliable source you have. 50 to 100 good companies he
 ### Step 7 (optional): Instant bot replies with Vercel
 By default the bot replies every ~10 minutes. For replies in about a second, free:
 1. On [vercel.com](https://vercel.com), sign in with GitHub, click **Add New > Project** and import this repo. No build settings needed: it finds `app.py` on its own.
-2. Before deploying, open **Environment Variables** and add `TELEGRAM_BOT_TOKEN`, `DATABASE_URL` (same values as your GitHub secrets) and `SUPABASE_POOLER_HOST` (your pooler host, e.g. `aws-1-us-west-2.pooler.supabase.com`). Click **Deploy**.
+2. Before deploying, open **Environment Variables** and add `TELEGRAM_BOT_TOKEN`, `DATABASE_URL` (same values as your GitHub secrets) and `SUPABASE_POOLER_HOST` (your pooler host, e.g. `aws-1-us-west-2.pooler.supabase.com`). Also add `CRON_SECRET`, any long random string (a password generator works), so only Vercel's own timer can trigger digests. Click **Deploy**.
 3. Copy your app URL (like `https://jobpipe-xyz.vercel.app`). In GitHub **Actions**, run **Switch bot reply mode** with mode `instant` and that URL.
 
 That's it. The webhook password is derived from your bot token, so there's no extra secret. The 10-minute bot workflow notices webhook mode and steps aside on its own. To go back, run the same workflow with mode `polling`.
@@ -161,6 +161,13 @@ config/candidates.txt    slugs to try with "Discover company boards"
 ## Privacy
 
 The bot stores a user's Telegram chat id, first name, the preferences they pick, and which jobs it sent them. Telegram never gives bots phone numbers, usernames or contacts. `/stop` deletes everything about a user immediately. Nothing is sold or shared. Secrets (bot token, database URL) live only in GitHub Secrets and never in this repo.
+
+### Security
+- Secrets live only in GitHub Secrets and Vercel environment variables. `.env` files are git ignored, and GitHub secret scanning with push protection blocks a commit that contains a token.
+- The bot token is stripped from every error message, so it can't show up in the public Actions logs. User chat ids are masked in logs too.
+- On Supabase, every table has row level security on and the public API roles are revoked, so the data is reachable only through the database password.
+- Workflows run with read-only repo access (except Keep alive, which commits), and none run on pull requests, so a fork can never see your secrets.
+- If a secret ever leaks: revoke the bot token in @BotFather (`/revoke`), reset the database password in Supabase, then update both in GitHub and Vercel.
 
 ## Disclaimer
 

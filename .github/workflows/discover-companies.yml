@@ -5,6 +5,9 @@ name: Discover company boards
 on:
   workflow_dispatch: {}
 
+permissions:
+  contents: read
+
 jobs:
   discover:
     runs-on: ubuntu-latest

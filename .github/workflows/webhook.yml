@@ -16,6 +16,9 @@ on:
         description: "Your Vercel app URL, like https://jobpipe-xyz.vercel.app (only for instant)"
         required: false
 
+permissions:
+  contents: read
+
 jobs:
   switch:
     runs-on: ubuntu-latest
