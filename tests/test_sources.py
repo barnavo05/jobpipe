@@ -75,3 +75,15 @@ def test_load_companies(tmp_path):
     f = tmp_path / "c.yaml"
     f.write_text("greenhouse:\n  - {slug: foo, name: Foo Inc}\nlever:\n  - bar-baz\n")
     assert ats.load_companies(f) == [("greenhouse", "foo", "Foo Inc"), ("lever", "bar-baz", "Bar Baz")]
+
+
+def test_jobspy_location_strings(monkeypatch):
+    calls = []
+    import jobspy
+    monkeypatch.setattr(jobspy, "scrape_jobs", lambda **k: calls.append((k["site_name"][0], k["location"])) or None)
+    monkeypatch.setattr(jobspy_source.time, "sleep", lambda s: None)
+    for loc in ("India", "Bengaluru", "remote"):
+        jobspy_source.search("data analyst", loc)
+    assert ("indeed", "India") in calls and ("indeed", "India, India") not in calls
+    assert ("indeed", "Bengaluru, India") in calls and ("naukri", "Bengaluru") in calls
+    assert ("naukri", "India") in calls
