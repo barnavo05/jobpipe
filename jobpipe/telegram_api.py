@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 
 import requests
@@ -12,8 +13,18 @@ from . import config
 log = logging.getLogger("jobpipe.telegram")
 
 
+def redact(text: str) -> str:
+    """The bot token is part of every request URL, so network errors can echo it.
+    Strip it (and anything token shaped) before a message reaches any log."""
+    text = str(text)
+    if config.TELEGRAM_BOT_TOKEN:
+        text = text.replace(config.TELEGRAM_BOT_TOKEN, "<token>")
+    return re.sub(r"\d{6,12}:[A-Za-z0-9_-]{30,}", "<token>", text)
+
+
 class TelegramError(Exception):
-    pass
+    def __init__(self, msg=""):
+        super().__init__(redact(msg))
 
 
 class BotBlocked(TelegramError):
@@ -38,7 +49,7 @@ class Telegram:
                 data = resp.json()
             except Exception as exc:
                 if attempt == 3:
-                    raise TelegramError(f"{method}: {exc}") from exc
+                    raise TelegramError(f"{method}: {exc}") from None
                 time.sleep(2 * (attempt + 1))
                 continue
             if data.get("ok"):

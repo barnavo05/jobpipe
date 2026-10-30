@@ -92,10 +92,31 @@ def engine(url: str | None = None) -> Engine:
     return create_engine(_normalize_url(url or config.DATABASE_URL), pool_pre_ping=True, future=True)
 
 
+TABLES = ["users", "jobs", "sent", "kv", "runs"]
+
+
+def _lockdown_statements() -> list[str]:
+    """Supabase also exposes every table in the public schema through its web API.
+    Turning on row level security with no policies, and revoking the API roles,
+    closes that door. JobPipe connects as the table owner, which RLS doesn't affect."""
+    stmts = []
+    for t in TABLES:
+        stmts.append(f"ALTER TABLE {t} ENABLE ROW LEVEL SECURITY")
+        stmts.append(f"""DO $$ BEGIN
+            IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+                REVOKE ALL ON TABLE {t} FROM anon, authenticated;
+            END IF; END $$""")
+    return stmts
+
+
 def init_db(url: str | None = None) -> None:
-    with engine(url).begin() as conn:
+    eng = engine(url)
+    with eng.begin() as conn:
         for stmt in SCHEMA:
             conn.execute(text(stmt))
+        if eng.dialect.name == "postgresql":
+            for stmt in _lockdown_statements():
+                conn.execute(text(stmt))
 
 
 # ---------------------------------------------------------------- users

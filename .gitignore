@@ -4,3 +4,10 @@ __pycache__/
 .pytest_cache/
 .venv/
 .vercel/
+.env.*
+!.env.example
+*.sqlite
+*.sqlite3
+*.pem
+*.key
+secrets*.txt

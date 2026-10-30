@@ -20,7 +20,7 @@ import json
 import os
 
 from jobpipe import admin, bot, config, db, digest
-from jobpipe.telegram_api import Telegram
+from jobpipe.telegram_api import Telegram, redact
 
 WEBHOOK_PATH = "/api/telegram"
 CRON_PATH = "/api/cron/daily"
@@ -58,7 +58,7 @@ def cron_daily(environ, start_response):
         _ensure_db()
         report = digest.run_once_today(tg=Telegram())
     except Exception as exc:
-        print(f"cron error: {type(exc).__name__}: {exc}")
+        print(f"cron error: {type(exc).__name__}: {redact(exc)}")
         return _respond(start_response, "500 Internal Server Error", b"digest failed, see logs")
     body = json.dumps(report, default=str).encode()
     print(f"cron daily: {body.decode()[:2000]}")
@@ -88,5 +88,5 @@ def app(environ, start_response):
         _ensure_db()
         bot.handle_update(Telegram(), update)
     except Exception as exc:  # always 200 so Telegram doesn't retry the same update forever
-        print(f"webhook error: {type(exc).__name__}: {exc}")
+        print(f"webhook error: {type(exc).__name__}: {redact(exc)}")
     return _respond(start_response, "200 OK")
