@@ -36,8 +36,8 @@ def format_job(n: int, job: Job) -> str:
             f"\n<a href=\"{html.escape(job.url, quote=True)}\">Apply here</a> <i>via {html.escape(src)}</i>")
 
 
-def build_digest(user: User, jobs: list[Job]) -> tuple[str, list]:
-    header = f"🔔 <b>{len(jobs)} new {html.escape(user.role_label or 'job')} {'match' if len(jobs) == 1 else 'matches'}</b> for you today\n"
+def build_digest(user: User, jobs: list[Job], when: str = "today") -> tuple[str, list]:
+    header = f"🔔 <b>{len(jobs)} new {html.escape(user.role_label or 'job')} {'match' if len(jobs) == 1 else 'matches'}</b> for you {when}\n"
     blocks = [format_job(i + 1, j) for i, j in enumerate(jobs)]
     footer = "\n<i>Tap 👎 on the ones that miss so I learn. /settings to tweak.</i>"
     # Telegram caps messages at 4096 chars, drop from the end if needed.
@@ -50,7 +50,7 @@ def build_digest(user: User, jobs: list[Job]) -> tuple[str, list]:
     return text, keyboard
 
 
-def run(tg: Telegram | None = None, dry_run: bool = False) -> dict:
+def run(tg: Telegram | None = None, dry_run: bool = False, when: str = "today") -> dict:
     users = db.active_users()
     jobs = db.recent_jobs()
     report = {"users": len(users), "pool": len(jobs), "notified": 0, "jobs_sent": 0, "blocked": 0, "errors": 0}
@@ -61,7 +61,7 @@ def run(tg: Telegram | None = None, dry_run: bool = False) -> dict:
                              db.disliked_companies(user.chat_id))
         if not picked:
             continue
-        text, keyboard = build_digest(user, picked)
+        text, keyboard = build_digest(user, picked, when)
         if dry_run:
             print(f"\n===== {user.chat_id} ({user.role_label}) =====\n{text}")
             report["notified"] += 1

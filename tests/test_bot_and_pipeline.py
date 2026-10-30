@@ -168,7 +168,7 @@ def test_digest_sends_once_per_day(tg, monkeypatch):
     from jobpipe import digest
     calls = {"collect": 0, "notify": 0}
     monkeypatch.setattr(collect, "run", lambda **k: calls.__setitem__("collect", calls["collect"] + 1) or {"use_jobspy": k.get("use_jobspy")})
-    monkeypatch.setattr(notify, "run", lambda tg=None: calls.__setitem__("notify", calls["notify"] + 1) or {})
+    monkeypatch.setattr(notify, "run", lambda tg=None, when=None: calls.__setitem__("notify", calls["notify"] + 1) or {})
     first = digest.run_once_today(tg=tg)
     second = digest.run_once_today(tg=tg)
     assert calls == {"collect": 1, "notify": 1}
@@ -181,7 +181,7 @@ def test_digest_still_sends_when_collect_fails(tg, monkeypatch):
     def boom(**k):
         raise RuntimeError("boards down")
     monkeypatch.setattr(collect, "run", boom)
-    monkeypatch.setattr(notify, "run", lambda tg=None: {"notified": 1})
+    monkeypatch.setattr(notify, "run", lambda tg=None, when=None: {"notified": 1})
     report = digest.run_once_today(tg=tg)
     assert report["notify"] == {"notified": 1} and "error" in report["collect"]
 
@@ -190,7 +190,7 @@ def test_digest_frees_the_slot_if_sending_crashes(tg, monkeypatch):
     import pytest
     from jobpipe import digest
     monkeypatch.setattr(collect, "run", lambda **k: {})
-    def boom(tg=None):
+    def boom(tg=None, when=None):
         raise RuntimeError("telegram down")
     monkeypatch.setattr(notify, "run", boom)
     with pytest.raises(RuntimeError):
@@ -241,3 +241,41 @@ def test_new_user_gets_jobs_right_after_signup(tg):
 def test_new_user_with_no_matches_is_told_search_is_running(tg):
     signup(tg)
     assert "searching LinkedIn, Naukri and Indeed" in tg.last["text"]
+
+
+def test_morning_and_evening_are_separate_slots(tg, monkeypatch):
+    from datetime import datetime
+    from jobpipe import digest
+    sent = []
+    monkeypatch.setattr(collect, "run", lambda **k: {})
+    monkeypatch.setattr(notify, "run", lambda tg=None, when=None: sent.append(when) or {})
+    at = lambda h: (lambda: datetime(2026, 10, 30, h, 10, tzinfo=digest.IST))
+    monkeypatch.setattr(digest, "now_ist", at(8))
+    digest.run_once_today(tg=tg)
+    assert "skipped" in digest.run_once_today(tg=tg)     # second morning trigger
+    monkeypatch.setattr(digest, "now_ist", at(18))
+    evening = digest.run_once_today(tg=tg)
+    assert evening["period"] == "pm"
+    assert "skipped" in digest.run_once_today(tg=tg)     # second evening trigger
+    assert sent == ["today", "this evening"]
+
+
+def test_cron_endpoint_evening_window(monkeypatch):
+    from datetime import datetime
+    import app as webapp
+    from jobpipe import digest
+    monkeypatch.delenv("CRON_SECRET", raising=False)
+    monkeypatch.setattr(webapp, "Telegram", lambda: None)
+    monkeypatch.setattr(webapp.digest, "run_once_today", lambda tg=None: {"ok": True})
+    for hour, ok in [(14, False), (18, True), (22, False)]:
+        monkeypatch.setattr(digest, "now_ist", lambda h=hour: datetime(2026, 10, 30, h, 5, tzinfo=digest.IST))
+        assert _call_app("/api/cron/daily")[0].startswith("200" if ok else "403"), hour
+
+
+def test_evening_digest_header():
+    from jobpipe.notify import build_digest
+    from jobpipe.normalize import finalize
+    from jobpipe.models import User
+    u = User(chat_id="1", role_label="Data Analyst")
+    j = finalize(Job(source="lever", title="Data Analyst", company="A", location="Pune", url="https://a"))
+    assert "for you this evening" in build_digest(u, [j], "this evening")[0]
