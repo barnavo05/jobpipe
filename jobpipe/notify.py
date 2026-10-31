@@ -39,15 +39,28 @@ def format_job(n: int, job: Job) -> str:
 def build_digest(user: User, jobs: list[Job], when: str = "today") -> tuple[str, list]:
     header = f"🔔 <b>{len(jobs)} new {html.escape(user.role_label or 'job')} {'match' if len(jobs) == 1 else 'matches'}</b> for you {when}\n"
     blocks = [format_job(i + 1, j) for i, j in enumerate(jobs)]
-    footer = "\n<i>Tap 👎 on the ones that miss so I learn. /settings to tweak.</i>"
+    footer = "\n<i>A job doesn't fit? Tap 👎 below and tell me why. /settings changes your search.</i>"
     # Telegram caps messages at 4096 chars, drop from the end if needed.
     while blocks and len(header + "\n\n".join(blocks) + footer) > 4000:
         blocks.pop()
     jobs = jobs[:len(blocks)]
     text = header + "\n" + "\n\n".join(blocks) + "\n" + footer
-    buttons = [{"text": f"👎 {i + 1}", "callback_data": f"fb:{j.uid}:-1"} for i, j in enumerate(jobs)]
-    keyboard = [buttons[i:i + 5] for i in range(0, len(buttons), 5)]
-    return text, keyboard
+    return text, digest_keyboard()
+
+
+def digest_keyboard(undo_index: int | None = None, company: str = "") -> list:
+    """Buttons under every digest. The jobs behind them are looked up by message id (db.digests)."""
+    rows = [[{"text": "👍 Good matches", "callback_data": "dg:good"},
+             {"text": "👎 A job doesn't fit", "callback_data": "dg:off"}]]
+    if undo_index is not None:
+        rows.append([{"text": f"↩ Undo: show {company[:24]} again", "callback_data": f"dg:undo:{undo_index}"}])
+    return rows
+
+
+def send_digest(tg: Telegram, user: User, text: str, keyboard: list, jobs: list[Job]) -> None:
+    res = tg.send(user.chat_id, text, keyboard)
+    db.mark_sent(user.chat_id, [j.uid for j in jobs])
+    db.save_digest(user.chat_id, (res or {}).get("message_id"), [j.uid for j in jobs])
 
 
 def run(tg: Telegram | None = None, dry_run: bool = False, when: str = "today") -> dict:
@@ -68,8 +81,7 @@ def run(tg: Telegram | None = None, dry_run: bool = False, when: str = "today") 
             report["jobs_sent"] += len(picked)
             continue
         try:
-            tg.send(user.chat_id, text, keyboard)
-            db.mark_sent(user.chat_id, [j.uid for j in picked])
+            send_digest(tg, user, text, keyboard, picked[:text.count("<a href=")])
             report["notified"] += 1
             report["jobs_sent"] += len(picked)
         except BotBlocked:

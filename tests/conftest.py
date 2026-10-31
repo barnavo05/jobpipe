@@ -22,8 +22,8 @@ class FakeTelegram:
     def edit(self, *a, **k):
         self.calls.append(("edit", a, k))
 
-    def answer_callback(self, cid, text=""):
-        self.calls.append(("answer", cid, text))
+    def answer_callback(self, cid, text="", alert=False):
+        self.calls.append(("answer", cid, text, alert))
 
     def call(self, method, **params):
         self.calls.append((method, params))

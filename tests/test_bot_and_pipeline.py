@@ -32,7 +32,7 @@ def test_full_signup_flow(tg):
     assert "Where do you want to work" in tg.last["text"]
 
     bot.handle_update(tg, cb("loc:done"))  # nothing picked yet
-    assert ("answer", "cb1", "Pick at least one 🙂") in tg.calls
+    assert ("answer", "cb1", "Pick at least one 🙂", False) in tg.calls
     bot.handle_update(tg, cb("loc:bengaluru"))
     bot.handle_update(tg, cb("loc:remote"))
     bot.handle_update(tg, cb("loc:remote"))  # toggle off again
@@ -102,11 +102,11 @@ def test_end_to_end_daily_run(tg, monkeypatch, tmp_path):
     assert n["notified"] == 2 and n["jobs_sent"] == 2
     digest = tg.sent[0]["text"]
     assert "Data Analyst" in digest and "Senior" not in digest and "Austin" not in digest
-    assert tg.sent[0]["keyboard"][0][0]["callback_data"].startswith("fb:")
+    assert [b["callback_data"] for b in tg.sent[0]["keyboard"][0]] == ["dg:good", "dg:off"]
 
     # Feedback works
-    uid = tg.sent[0]["keyboard"][0][0]["callback_data"].split(":")[1]
-    bot.handle_update(tg, cb(f"fb:{uid}:-1", chat=1))
+    msg = tg.sent[0]
+    bot.handle_update(tg, cb("dg:good", chat=int(msg["chat_id"]), mid=msg["message_id"]))
 
     # Next day: nothing new, nobody gets spammed with repeats
     tg.sent.clear()
