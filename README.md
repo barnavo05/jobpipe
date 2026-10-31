@@ -35,7 +35,7 @@ Runs 100% free: GitHub Actions + Supabase free tier + Telegram bot.
 
 **Dedupe:** the same job posted on Naukri, LinkedIn and the company site is stored once (company + title + city fingerprint), so nobody gets it three times.
 
-**Learns a bit:** every digest has 👎 buttons. Thumb down a company twice and it's muted for you.
+**Clear feedback buttons:** every digest has **👍 Good matches** and **👎 A job doesn't fit**. Tap 👎, pick the job number, then say why: not my role, wrong experience level, wrong city, or hide that company for good (with Undo). Every tap shows a short popup saying what changed. `/unhide` brings hidden companies back.
 
 ---
 
@@ -154,7 +154,7 @@ config/candidates.txt    slugs to try with "Discover company boards"
 
 ## Owner tools
 
-- `/stats` (only works from the `ADMIN_CHAT_ID` chat): users, listings scanned this week, jobs sent, 👎 count
+- `/stats` (only works from the `ADMIN_CHAT_ID` chat): users, listings scanned this week, jobs sent, 👍 and 👎 counts
 - With `ADMIN_CHAT_ID` set on Vercel, you also get a one-line report after each morning and evening digest
 - Every collection run is logged to the `runs` table, so the numbers are real, not estimates
 

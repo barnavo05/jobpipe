@@ -83,8 +83,10 @@ class Telegram:
         return self.call("editMessageReplyMarkup", chat_id=chat_id, message_id=message_id,
                          reply_markup={"inline_keyboard": keyboard or []})
 
-    def answer_callback(self, callback_id: str, text: str = ""):
-        return self.call("answerCallbackQuery", callback_query_id=callback_id, text=text or None)
+    def answer_callback(self, callback_id: str, text: str = "", alert: bool = False):
+        """alert=True shows a popup with an OK button instead of a brief toast (max 200 chars)."""
+        return self.call("answerCallbackQuery", callback_query_id=callback_id, text=(text or "")[:200] or None,
+                         show_alert="true" if alert else None)
 
     def get_updates(self, offset: int | None, timeout: int = 0):
         return self.call("getUpdates", _http_timeout=timeout + 15, offset=offset, timeout=timeout,

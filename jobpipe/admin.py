@@ -17,7 +17,7 @@ def stats_text() -> str:
         f"🆕 New jobs found (7 days): {s['new_jobs_7d']:,}\n"
         f"🗂 Jobs in pool now: {s['jobs_in_pool']:,}\n"
         f"📨 Jobs sent: {s['sent_24h']} today · {s['sent_7d']} this week · {s['sent_total']:,} all time\n"
-        f"👎 Thumbs down: {s['thumbs_down']}"
+        f"👍 Good matches: {s['thumbs_up']} · 👎 Didn't fit: {s['thumbs_down']}"
     )
 
 

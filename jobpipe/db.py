@@ -59,7 +59,23 @@ SCHEMA = [
         new_jobs INTEGER
     )""",
     "CREATE INDEX IF NOT EXISTS idx_runs_ran_at ON runs (ran_at)",
+    # Which jobs (in order) a digest message showed, so its buttons can say "job #3".
+    """CREATE TABLE IF NOT EXISTS digests (
+        chat_id TEXT,
+        message_id INTEGER,
+        uids TEXT,
+        sent_at TEXT,
+        PRIMARY KEY (chat_id, message_id)
+    )""",
 ]
+
+# Feedback codes stored in sent.feedback
+FB_GOOD = 1
+FB_LEGACY_DOWN = -1   # old "👎 n" buttons
+FB_NOT_ROLE = -2
+FB_WRONG_EXP = -3
+FB_WRONG_CITY = -4
+FB_HIDE_COMPANY = -5
 
 
 _SUPABASE_DIRECT = re.compile(
@@ -92,7 +108,7 @@ def engine(url: str | None = None) -> Engine:
     return create_engine(_normalize_url(url or config.DATABASE_URL), pool_pre_ping=True, future=True)
 
 
-TABLES = ["users", "jobs", "sent", "kv", "runs"]
+TABLES = ["users", "jobs", "sent", "kv", "runs", "digests"]
 
 
 def _lockdown_statements() -> list[str]:
@@ -176,6 +192,8 @@ def update_user(chat_id: str, **fields) -> User:
 def delete_user(chat_id: str) -> None:
     with engine().begin() as conn:
         conn.execute(text("DELETE FROM sent WHERE chat_id = :c"), {"c": str(chat_id)})
+        conn.execute(text("DELETE FROM digests WHERE chat_id = :c"), {"c": str(chat_id)})
+        conn.execute(text("DELETE FROM kv WHERE key = :k"), {"k": f"hidden:{chat_id}"})
         conn.execute(text("DELETE FROM users WHERE chat_id = :c"), {"c": str(chat_id)})
 
 
@@ -253,6 +271,7 @@ def prune_jobs(days: int | None = None) -> int:
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days or config.JOB_RETENTION_DAYS)).isoformat()
     with engine().begin() as conn:
         res = conn.execute(text("DELETE FROM jobs WHERE fetched_at < :c"), {"c": cutoff})
+        conn.execute(text("DELETE FROM digests WHERE sent_at < :c"), {"c": cutoff})
     return res.rowcount or 0
 
 
@@ -280,13 +299,63 @@ def set_feedback(chat_id: str, uid: str, value: int) -> None:
                      {"v": value, "c": str(chat_id), "u": uid})
 
 
+def set_feedback_if_empty(chat_id: str, uids: list[str], value: int) -> None:
+    if not uids:
+        return
+    with engine().begin() as conn:
+        conn.execute(text("UPDATE sent SET feedback = :v WHERE chat_id = :c AND uid = :u AND feedback IS NULL"),
+                     [{"v": value, "c": str(chat_id), "u": u} for u in uids])
+
+
+def hidden_companies(chat_id: str) -> list[str]:
+    """Companies the user chose to hide. Kept in kv so it survives old jobs being pruned."""
+    return json.loads(kv_get(f"hidden:{chat_id}") or "[]")
+
+
+def hide_company(chat_id: str, company: str) -> None:
+    names = hidden_companies(chat_id)
+    if company.lower() not in {n.lower() for n in names}:
+        kv_set(f"hidden:{chat_id}", json.dumps((names + [company])[-200:]))
+
+
+def unhide_company(chat_id: str, company: str) -> bool:
+    names = hidden_companies(chat_id)
+    keep = [n for n in names if n.lower() != company.lower().strip()]
+    kv_set(f"hidden:{chat_id}", json.dumps(keep))
+    with engine().begin() as conn:  # forget old 👎 taps too, or the company would stay muted
+        conn.execute(text(
+            "UPDATE sent SET feedback = NULL WHERE chat_id = :c AND feedback IN (-1, -5) AND uid IN "
+            "(SELECT uid FROM jobs WHERE LOWER(company) = :co)"), {"c": str(chat_id), "co": company.lower().strip()})
+    return len(keep) != len(names)
+
+
 def disliked_companies(chat_id: str, threshold: int = 2) -> set[str]:
-    """Companies a user thumbed down at least `threshold` times get muted for them."""
+    """Companies to skip for this user: ones they hid, plus (old buttons) 2+ thumbs down."""
     with engine().connect() as conn:
         rows = conn.execute(text(
             "SELECT j.company, COUNT(*) FROM sent s JOIN jobs j ON j.uid = s.uid "
             "WHERE s.chat_id = :c AND s.feedback = -1 GROUP BY j.company"), {"c": str(chat_id)}).all()
-    return {r[0].lower() for r in rows if r[1] >= threshold}
+    return {r[0].lower() for r in rows if r[1] >= threshold} | {n.lower() for n in hidden_companies(chat_id)}
+
+
+# ---------------------------------------------------------------- digests
+
+def save_digest(chat_id: str, message_id, uids: list[str]) -> None:
+    if not message_id or not uids:
+        return
+    with engine().begin() as conn:
+        conn.execute(text("INSERT INTO digests (chat_id, message_id, uids, sent_at) VALUES (:c, :m, :u, :t) "
+                          "ON CONFLICT (chat_id, message_id) DO NOTHING"),
+                     {"c": str(chat_id), "m": int(message_id), "u": json.dumps(uids), "t": utcnow_iso()})
+
+
+def digest_uids(chat_id: str, message_id) -> list[str]:
+    if not message_id:
+        return []
+    with engine().connect() as conn:
+        row = conn.execute(text("SELECT uids FROM digests WHERE chat_id = :c AND message_id = :m"),
+                           {"c": str(chat_id), "m": int(message_id)}).first()
+    return json.loads(row[0]) if row else []
 
 
 # ---------------------------------------------------------------- kv
@@ -319,7 +388,8 @@ def stats() -> dict:
         "sent_24h": "SELECT COUNT(*) FROM sent WHERE sent_at >= :day",
         "sent_7d": "SELECT COUNT(*) FROM sent WHERE sent_at >= :week",
         "sent_total": "SELECT COUNT(*) FROM sent",
-        "thumbs_down": "SELECT COUNT(*) FROM sent WHERE feedback = -1",
+        "thumbs_down": "SELECT COUNT(*) FROM sent WHERE feedback < 0",
+        "thumbs_up": "SELECT COUNT(*) FROM sent WHERE feedback > 0",
     }
     with engine().connect() as conn:
         return {k: int(conn.execute(text(sql), {"week": week, "day": day}).scalar_one() or 0) for k, sql in q.items()}

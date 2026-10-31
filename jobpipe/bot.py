@@ -30,18 +30,23 @@ HELP = (
     "/me  see your current alert settings\n"
     "/settings  change role, experience or cities\n"
     "/exclude intern, sales  hide titles with these words\n"
+    "/unhide  show companies you hid again\n"
     "/pause  stop alerts for a while\n"
     "/resume  turn alerts back on\n"
     "/stop  delete all your data\n"
     "/privacy  what I store about you\n\n"
-    "Alerts land twice a day, around 8 AM and 6 PM. Tap 👎 on jobs that miss and I'll learn."
+    "Alerts land twice a day, around 8 AM and 6 PM.\n\n"
+    "<b>Buttons under each alert</b>\n"
+    "👍 Good matches: tells me matching is on track\n"
+    "👎 A job doesn't fit: pick the job, then why (wrong role, wrong level, wrong city), "
+    "or hide that company for good"
 )
 
 PRIVACY = (
     "<b>What JobPipe stores</b>\n\n"
     "• Your Telegram chat id and first name, so I can message you\n"
     "• The role, experience and cities you picked\n"
-    "• Which jobs I sent you and your 👎 taps\n\n"
+    "• Which jobs I sent you, your 👍/👎 feedback and companies you hid\n\n"
     "<b>What it never sees</b>\n"
     "Your phone number, username, contacts or other chats. Telegram doesn't share those with bots.\n\n"
     "Nothing is sold or shared. Send /stop and everything about you is deleted instantly.\n"
@@ -84,7 +89,10 @@ def describe(user: User) -> str:
         f"<b>Where:</b> {html.escape(locs)}",
     ]
     if user.exclude:
-        lines.append(f"<b>Hiding:</b> {html.escape(', '.join(user.exclude))}")
+        lines.append(f"<b>Hiding titles with:</b> {html.escape(', '.join(user.exclude))}")
+    hidden = db.hidden_companies(user.chat_id)
+    if hidden:
+        lines.append(f"<b>Hidden companies:</b> {html.escape(', '.join(hidden[-10:]))} (/unhide)")
     lines.append(f"<b>Alerts:</b> {'on ✅' if user.active else 'paused ⏸'}")
     return "\n".join(lines)
 
@@ -127,7 +135,7 @@ JOBS_PER_REQUEST = 5
 def send_jobs_now(tg: Telegram, user: User, first_time: bool = False) -> None:
     """On-demand matches from jobs already collected (no scraping per request: fast, never blocked)."""
     from .match import matches_for  # local import keeps bot importable without heavy deps
-    from .notify import build_digest
+    from .notify import build_digest, send_digest
     if not profile_complete(user):
         tg.send(user.chat_id, "Let's set you up first. Send /start.")
         return
@@ -145,8 +153,7 @@ def send_jobs_now(tg: Telegram, user: User, first_time: bool = False) -> None:
         return
     text, keyboard = build_digest(user, picked)
     text = text.replace("for you today", "to start with" if first_time else "for you right now", 1)
-    tg.send(user.chat_id, text, keyboard)
-    db.mark_sent(user.chat_id, [j.uid for j in picked])
+    send_digest(tg, user, text, keyboard, picked[:text.count("<a href=")])
 
 
 def handle_message(tg: Telegram, msg: dict) -> None:
@@ -195,6 +202,19 @@ def handle_message(tg: Telegram, msg: dict) -> None:
             words = [w.strip() for w in re.split(r"[,\n]", arg) if w.strip()][:15]
             db.update_user(chat_id, exclude=words)
             tg.send(chat_id, f"Got it, I'll hide titles with: {html.escape(', '.join(words))}")
+    elif cmd == "/unhide":
+        hidden = db.hidden_companies(chat_id)
+        if not arg:
+            tg.send(chat_id, ("Hidden companies: " + html.escape(", ".join(hidden)) +
+                              "\n\nShow one again with /unhide <i>company name</i>, or all with /unhide all")
+                    if hidden else "You haven't hidden any companies.")
+        elif arg.lower() == "all":
+            for name in hidden:
+                db.unhide_company(chat_id, name)
+            tg.send(chat_id, "Done. Every company can show up again.")
+        else:
+            db.unhide_company(chat_id, arg)
+            tg.send(chat_id, f"Done. {html.escape(arg)} jobs can show up again.")
     elif cmd == "/jobs":
         send_jobs_now(tg, user)
     elif cmd == "/help":
@@ -255,13 +275,95 @@ def handle_callback(tg: Telegram, cb: dict) -> None:
             db.update_user(chat_id, locations=locs)
             if message_id:
                 tg.edit_keyboard(chat_id, message_id, loc_keyboard(locs))
-    elif kind == "fb":
+    elif kind == "dg":
+        toast, alert = handle_digest_button(tg, user, message_id, value)
+        if cb.get("id"):
+            tg.answer_callback(cb["id"], toast, alert)
+        return
+    elif kind == "fb":  # buttons on digests sent before the redesign
         uid, _, val = value.partition(":")
         db.set_feedback(chat_id, uid, -1 if val == "-1" else 1)
         toast = "Got it, fewer like that 👍" if val == "-1" else "Noted 👍"
 
     if cb.get("id"):
         tg.answer_callback(cb["id"], toast)
+
+
+REASONS = {
+    "role": (db.FB_NOT_ROLE, "🎯 Not my role"),
+    "exp": (db.FB_WRONG_EXP, "🧭 Wrong experience level"),
+    "city": (db.FB_WRONG_CITY, "📍 Wrong city"),
+    "co": (db.FB_HIDE_COMPANY, None),  # label names the company
+}
+
+
+def _picker_keyboard(n: int) -> list:
+    nums = [{"text": f"#{i + 1}", "callback_data": f"dg:pick:{i}"} for i in range(n)]
+    return [nums[i:i + 5] for i in range(0, n, 5)] + [[{"text": "↩ Back", "callback_data": "dg:back"}]]
+
+
+def _reason_keyboard(i: int, company: str) -> list:
+    return [
+        [{"text": REASONS["role"][1], "callback_data": f"dg:why:{i}:role"},
+         {"text": REASONS["exp"][1], "callback_data": f"dg:why:{i}:exp"}],
+        [{"text": REASONS["city"][1], "callback_data": f"dg:why:{i}:city"},
+         {"text": f"🚫 Hide all {company[:20]} jobs", "callback_data": f"dg:why:{i}:co"}],
+        [{"text": "↩ Back", "callback_data": "dg:off"}],
+    ]
+
+
+def handle_digest_button(tg: Telegram, user: User, message_id, value: str) -> tuple[str, bool]:
+    """Every tap answers with what just happened. Returns (popup text, show as alert)."""
+    from .notify import digest_keyboard
+    chat_id = user.chat_id
+    uids = db.digest_uids(chat_id, message_id)
+    if not uids:
+        return "This alert is too old to rate. Use the buttons on your newest one 🙂", True
+    action, _, rest = value.partition(":")
+    idx_s, _, reason = rest.partition(":")
+    i = int(idx_s) if idx_s.isdigit() else -1
+
+    if action == "good":
+        db.set_feedback_if_empty(chat_id, uids, db.FB_GOOD)
+        return ("Thanks! 👍 Good to know these fit. If one ever doesn't, tap 👎 and tell me why, "
+                "so I can fix it."), True
+    if action == "off":
+        tg.edit_keyboard(chat_id, message_id, _picker_keyboard(len(uids)))
+        return "Which job doesn't fit? Tap its number (the numbers match the list above).", False
+    if action == "back":
+        tg.edit_keyboard(chat_id, message_id, digest_keyboard())
+        return "", False
+    if not 0 <= i < len(uids):
+        return "", False
+    job = db.get_job(uids[i])
+    company = job.company if job else "this company"
+
+    if action == "pick":
+        tg.edit_keyboard(chat_id, message_id, _reason_keyboard(i, company))
+        return f"Why doesn't #{i + 1} fit?", False
+    if action == "undo":
+        db.unhide_company(chat_id, company)
+        tg.edit_keyboard(chat_id, message_id, digest_keyboard())
+        return f"Done. {company} jobs can show up again.", True
+    if action == "why" and reason in REASONS:
+        db.set_feedback(chat_id, uids[i], REASONS[reason][0])
+        if reason == "co":
+            db.hide_company(chat_id, company)
+            tg.edit_keyboard(chat_id, message_id, digest_keyboard(undo_index=i, company=company))
+            return f"Done 🚫 You won't get jobs from {company} anymore.\n\nChanged your mind? Tap Undo below.", True
+        tg.edit_keyboard(chat_id, message_id, digest_keyboard())
+        n = f"#{i + 1}"
+        if reason == "role":
+            return (f"Got it, {n} isn't your role. Saved, it helps me match better.\n\n"
+                    "Tip: hide titles with a word, like /exclude sales"), True
+        if reason == "exp":
+            exp = next((lbl for lbl, lo, hi in EXPERIENCE_BUCKETS.values() if (lo, hi) == (user.exp_min, user.exp_max)), "any")
+            return (f"Got it, {n} is the wrong level. You're set to {exp}. Saved, it helps me match better.\n\n"
+                    "Change your level with /settings"), True
+        locs = ", ".join(LOCATION_LABELS.get(l, l) for l in user.locations)[:60] or "not set"
+        return (f"Got it, {n} is in the wrong place. You're set to {locs}.\n\n"
+                "Change your cities with /settings"), True
+    return "", False
 
 
 def handle_update(tg: Telegram, update: dict) -> None:
@@ -285,6 +387,7 @@ def set_commands(tg: Telegram) -> None:
         {"command": "me", "description": "See your settings"},
         {"command": "settings", "description": "Change role, experience, cities"},
         {"command": "exclude", "description": "Hide titles with certain words"},
+        {"command": "unhide", "description": "Show hidden companies again"},
         {"command": "pause", "description": "Pause alerts"},
         {"command": "resume", "description": "Resume alerts"},
         {"command": "stop", "description": "Delete my data"},
