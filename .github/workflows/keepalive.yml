@@ -15,7 +15,7 @@ jobs:
   keepalive:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Commit only if the repo has been idle
         run: |
           last=$(git log -1 --format=%ct)
