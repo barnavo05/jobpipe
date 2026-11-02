@@ -75,6 +75,10 @@ def run(users: list[User] | None = None, use_jobspy: bool = True, kind: str | No
 
     report["by_source"] = dict(Counter(j.source for j in all_jobs))
     report["new_jobs"] = db.insert_jobs(all_jobs)
+    try:
+        report["reposts"] = db.record_seen(all_jobs)
+    except Exception as exc:  # freshness tags are a bonus, never fail collection over them
+        log.warning("job history update failed: %s", exc)
     report["pruned"] = db.prune_jobs()
     report["scanned"] = scanned
     try:

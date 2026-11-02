@@ -43,6 +43,18 @@ SCHEMA = [
         fetched_at TEXT
     )""",
     "CREATE INDEX IF NOT EXISTS idx_jobs_fetched ON jobs (fetched_at)",
+    # When each job was seen. Outlives the jobs table (180 vs 30 days) so a job that
+    # vanishes and comes back is recognised as a repost. See freshness.py.
+    """CREATE TABLE IF NOT EXISTS job_history (
+        uid TEXT PRIMARY KEY,
+        first_seen TEXT,
+        last_seen TEXT,
+        first_posted TEXT,
+        last_posted TEXT,
+        reposts INTEGER DEFAULT 0
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_job_history_last_seen ON job_history (last_seen)",
+
     """CREATE TABLE IF NOT EXISTS sent (
         chat_id TEXT,
         uid TEXT,
@@ -108,7 +120,7 @@ def engine(url: str | None = None) -> Engine:
     return create_engine(_normalize_url(url or config.DATABASE_URL), pool_pre_ping=True, future=True)
 
 
-TABLES = ["users", "jobs", "sent", "kv", "runs", "digests"]
+TABLES = ["users", "jobs", "sent", "kv", "runs", "digests", "job_history"]
 
 
 def _lockdown_statements() -> list[str]:
@@ -133,6 +145,15 @@ def init_db(url: str | None = None) -> None:
         if eng.dialect.name == "postgresql":
             for stmt in _lockdown_statements():
                 conn.execute(text(stmt))
+        # One time: start job_history from the jobs already stored. last_seen stays empty:
+        # old rows never recorded later sightings, so a gap from fetched_at would be fake.
+        claimed = conn.execute(text("INSERT INTO kv (key, value) VALUES ('migrated:job_history', '1') "
+                                    "ON CONFLICT (key) DO NOTHING")).rowcount
+        if claimed:
+            conn.execute(text(
+                "INSERT INTO job_history (uid, first_seen, last_seen, first_posted, last_posted, reposts) "
+                "SELECT uid, fetched_at, NULL, posted_at, posted_at, 0 FROM jobs WHERE true "
+                "ON CONFLICT (uid) DO NOTHING"))
 
 
 # ---------------------------------------------------------------- users
@@ -251,19 +272,55 @@ def _row_to_job(row) -> Job:
     return Job(source=m["source"], title=m["title"], company=m["company"], location=m["location"],
                url=m["url"], description=m["description"] or "", is_remote=bool(m["is_remote"]),
                posted_at=m["posted_at"], exp_min=m["exp_min"], exp_max=m["exp_max"],
-               uid=m["uid"], fetched_at=m["fetched_at"])
+               uid=m["uid"], fetched_at=m["fetched_at"], first_seen=m.get("h_first_seen"),
+               first_posted=m.get("h_first_posted"), reposts=int(m.get("h_reposts") or 0))
+
+
+_JOB_SELECT = ("SELECT j.*, h.first_seen AS h_first_seen, h.first_posted AS h_first_posted, "
+               "h.reposts AS h_reposts FROM jobs j LEFT JOIN job_history h ON h.uid = j.uid ")
+
+
+def record_seen(jobs: list[Job], now: datetime | None = None) -> int:
+    """Update job_history for every job seen in this collection run. Returns new reposts found."""
+    from .freshness import next_history
+    now = now or datetime.now(timezone.utc)
+    unique: dict[str, Job] = {}
+    for j in jobs:
+        unique.setdefault(j.uid, j)
+    if not unique:
+        return 0
+    cols = ["uid", "first_seen", "last_seen", "first_posted", "last_posted", "reposts"]
+    existing: dict[str, dict] = {}
+    uids = list(unique)
+    with engine().connect() as conn:
+        for i in range(0, len(uids), 500):
+            chunk = uids[i:i + 500]
+            params = {f"u{n}": u for n, u in enumerate(chunk)}
+            ph = ", ".join(f":u{n}" for n in range(len(chunk)))
+            for r in conn.execute(text(f"SELECT {', '.join(cols)} FROM job_history WHERE uid IN ({ph})"), params):
+                existing[r[0]] = dict(zip(cols, r))
+    rows = [next_history(existing.get(u), j, now) for u, j in unique.items()]
+    new_reposts = sum(1 for r in rows if r["reposts"] > int((existing.get(r["uid"]) or {}).get("reposts") or 0))
+    with engine().begin() as conn:
+        conn.execute(text(
+            "INSERT INTO job_history (uid, first_seen, last_seen, first_posted, last_posted, reposts) "
+            "VALUES (:uid, :first_seen, :last_seen, :first_posted, :last_posted, :reposts) "
+            "ON CONFLICT (uid) DO UPDATE SET last_seen = excluded.last_seen, "
+            "first_posted = excluded.first_posted, last_posted = excluded.last_posted, "
+            "reposts = excluded.reposts"), rows)
+    return new_reposts
 
 
 def recent_jobs(days: int | None = None) -> list[Job]:
     since = (datetime.now(timezone.utc) - timedelta(days=days or config.JOB_LOOKBACK_DAYS)).replace(microsecond=0).isoformat()
     with engine().connect() as conn:
-        rows = conn.execute(text("SELECT * FROM jobs WHERE fetched_at >= :s ORDER BY fetched_at DESC"), {"s": since}).all()
+        rows = conn.execute(text(_JOB_SELECT + "WHERE j.fetched_at >= :s ORDER BY j.fetched_at DESC"), {"s": since}).all()
     return [_row_to_job(r) for r in rows]
 
 
 def get_job(uid: str) -> Job | None:
     with engine().connect() as conn:
-        row = conn.execute(text("SELECT * FROM jobs WHERE uid = :u"), {"u": uid}).first()
+        row = conn.execute(text(_JOB_SELECT + "WHERE j.uid = :u"), {"u": uid}).first()
     return _row_to_job(row) if row else None
 
 
@@ -272,6 +329,8 @@ def prune_jobs(days: int | None = None) -> int:
     with engine().begin() as conn:
         res = conn.execute(text("DELETE FROM jobs WHERE fetched_at < :c"), {"c": cutoff})
         conn.execute(text("DELETE FROM digests WHERE sent_at < :c"), {"c": cutoff})
+        history_cutoff = (datetime.now(timezone.utc) - timedelta(days=config.HISTORY_RETENTION_DAYS)).isoformat()
+        conn.execute(text("DELETE FROM job_history WHERE last_seen < :c"), {"c": history_cutoff})
     return res.rowcount or 0
 
 

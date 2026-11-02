@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 
+from . import freshness
 from .models import Job, User
 from .normalize import detect_cities, is_india, remote_open_to_india
 from .roles import title_matches
@@ -71,6 +72,10 @@ def score(job: Job, user: User) -> float:
     if job.source in ("greenhouse", "lever", "ashby"):
         s += 1  # direct company posting, usually fresher and less spammy
     s += max(0.0, 3 - _age_days(job))  # newer is better
+    if freshness.is_fresh(job):
+        s += 1  # just posted: applying early gets more callbacks
+    elif freshness.is_ghosty(job):
+        s -= 2  # reposted again and again or open for a month: likely a ghost listing
     return s
 
 
