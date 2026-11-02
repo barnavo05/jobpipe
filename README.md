@@ -185,3 +185,6 @@ Provided as is, without warranty. Use at your own risk.
 - Embedding based matching using the 👍/👎 data
 - A small landing page on GitHub Pages with a "Start on Telegram" button
 - WhatsApp channel later, once there's a reason to pay for it
+
+## License
+MIT, see [LICENSE](LICENSE). Use it, fork it, build on it. Just keep the copyright notice.
