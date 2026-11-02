@@ -35,6 +35,13 @@ Runs 100% free: GitHub Actions + Supabase free tier + Telegram bot.
 
 **Dedupe:** the same job posted on Naukri, LinkedIn and the company site is stored once (company + title + city fingerprint), so nobody gets it three times.
 
+**Fresh vs ghost jobs:** JobPipe remembers when it first and last saw every listing (for 6 months, longer than the jobs themselves). So each alert can say:
+- 🆕 *Posted 5 hrs ago on the company site. You're early*
+- ♻️ *Reposted 3x since Aug 12, may never close* (it disappeared and came back, or its date got bumped)
+- ⏳ *Open since Sep 20, may be filled*
+
+Fresh jobs rank higher, ghost ones lower. Nothing gets hidden, you decide.
+
 **Clear feedback buttons:** every digest has **👍 Good matches** and **👎 A job doesn't fit**. Tap 👎, pick the job number, then say why: not my role, wrong experience level, wrong city, or hide that company for good (with Undo). Every tap shows a short popup saying what changed. `/unhide` brings hidden companies back.
 
 ---
@@ -139,6 +146,7 @@ jobpipe/
   sources/ats.py         Greenhouse, Lever, Ashby (official public APIs)
   sources/adzuna.py      Adzuna India API
   sources/jobspy_source  Indeed, LinkedIn, Naukri via JobSpy
+  freshness.py           fresh / reposted / stale detection from job history
   normalize.py           HTML cleanup, city detection, experience extraction, dedupe ids
   roles.py               preset roles and title patterns
   match.py               matching + ranking

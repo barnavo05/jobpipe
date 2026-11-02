@@ -58,6 +58,7 @@ MAX_SEARCH_QUERIES = _int("MAX_SEARCH_QUERIES", 25)  # distinct (role, city) sea
 MAX_JOBS_PER_USER = _int("MAX_JOBS_PER_USER", 10)  # per daily digest
 JOB_LOOKBACK_DAYS = _int("JOB_LOOKBACK_DAYS", 3)  # only alert on recently fetched jobs
 JOB_RETENTION_DAYS = _int("JOB_RETENTION_DAYS", 30)
+HISTORY_RETENTION_DAYS = _int("HISTORY_RETENTION_DAYS", 180)  # repost detection memory
 
 COMPANIES_FILE = Path(_env("COMPANIES_FILE", str(ROOT / "config" / "companies.yaml")))
 

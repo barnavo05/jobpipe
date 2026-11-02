@@ -5,7 +5,7 @@ import html
 import logging
 import time
 
-from . import config, db
+from . import config, db, freshness
 from .match import matches_for
 from .models import Job, User
 from .telegram_api import BotBlocked, Telegram, TelegramError
@@ -32,7 +32,9 @@ def format_job(n: int, job: Job) -> str:
     if exp_label(job):
         bits.append(f"🧭 {exp_label(job)}")
     src = SOURCE_LABELS.get(job.source, job.source)
+    flag = freshness.tag(job)
     return (f"<b>{n}. {html.escape(job.title[:100])}</b>\n" + "  ·  ".join(bits) +
+            (f"\n{html.escape(flag, quote=False)}" if flag else "") +
             f"\n<a href=\"{html.escape(job.url, quote=True)}\">Apply here</a> <i>via {html.escape(src)}</i>")
 
 

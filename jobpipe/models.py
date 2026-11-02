@@ -22,6 +22,10 @@ class Job:
     exp_max: int | None = None
     uid: str = ""
     fetched_at: str = field(default_factory=utcnow_iso)
+    # From db.job_history (not stored on the jobs row): see freshness.py
+    first_seen: str | None = None
+    first_posted: str | None = None
+    reposts: int = 0
 
 
 @dataclass
