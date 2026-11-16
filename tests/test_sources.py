@@ -1,3 +1,4 @@
+import pytest
 import pandas as pd
 
 from jobpipe.normalize import finalize
@@ -78,8 +79,8 @@ def test_load_companies(tmp_path):
 
 
 def test_jobspy_location_strings(monkeypatch):
+    jobspy = pytest.importorskip("jobspy", reason="python-jobspy is in requirements-full.txt")
     calls = []
-    import jobspy
     monkeypatch.setattr(jobspy, "scrape_jobs", lambda **k: calls.append((k["site_name"][0], k["location"])) or None)
     monkeypatch.setattr(jobspy_source.time, "sleep", lambda s: None)
     for loc in ("India", "Bengaluru", "remote"):

@@ -1,5 +1,8 @@
 # JobPipe 🔔
 
+[![tests](https://github.com/barnavo05/jobpipe/actions/workflows/tests.yml/badge.svg)](https://github.com/barnavo05/jobpipe/actions/workflows/tests.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 **Job hunting shouldn't mean refreshing 6 portals every morning.**
 
 JobPipe checks company career pages and job portals every day, matches what it finds against what you told it (role, experience, city), and sends you one clean Telegram message with only the jobs that fit. No spam, no repeats, no app to install.
